@@ -73,25 +73,25 @@ describe('registered groups DB query', () => {
 });
 
 describe('credentials detection', () => {
-  it('detects ANTHROPIC_API_KEY in env content', () => {
+  it('detects ANTHROPIC_BASE_URL in env content', () => {
     const content =
-      'SOME_KEY=value\nANTHROPIC_API_KEY=sk-ant-test123\nOTHER=foo';
+      'SOME_KEY=value\nANTHROPIC_BASE_URL=https://api.example.com\nOTHER=foo';
     const hasCredentials =
-      /^(CLAUDE_CODE_OAUTH_TOKEN|ANTHROPIC_API_KEY)=/m.test(content);
+      /^(ANTHROPIC_BASE_URL|ANTHROPIC_AUTH_TOKEN)=/m.test(content);
     expect(hasCredentials).toBe(true);
   });
 
-  it('detects CLAUDE_CODE_OAUTH_TOKEN in env content', () => {
-    const content = 'CLAUDE_CODE_OAUTH_TOKEN=token123';
+  it('detects ANTHROPIC_AUTH_TOKEN in env content', () => {
+    const content = 'ANTHROPIC_AUTH_TOKEN=token123';
     const hasCredentials =
-      /^(CLAUDE_CODE_OAUTH_TOKEN|ANTHROPIC_API_KEY)=/m.test(content);
+      /^(ANTHROPIC_BASE_URL|ANTHROPIC_AUTH_TOKEN)=/m.test(content);
     expect(hasCredentials).toBe(true);
   });
 
   it('returns false when no credentials', () => {
     const content = 'ASSISTANT_NAME="Andy"\nOTHER=foo';
     const hasCredentials =
-      /^(CLAUDE_CODE_OAUTH_TOKEN|ANTHROPIC_API_KEY)=/m.test(content);
+      /^(ANTHROPIC_BASE_URL|ANTHROPIC_AUTH_TOKEN)=/m.test(content);
     expect(hasCredentials).toBe(false);
   });
 });

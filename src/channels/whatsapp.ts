@@ -17,7 +17,7 @@ import {
   STORE_DIR,
 } from '../config.js';
 import { getLastGroupSync, setLastGroupSync, updateChatName } from '../db.js';
-import { logger } from '../logger.js';
+import { whatsappLogger as logger } from '../logger.js';
 import {
   Channel,
   OnInboundMessage,

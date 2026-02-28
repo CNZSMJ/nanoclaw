@@ -18,6 +18,18 @@ vi.mock('../logger.js', () => ({
     warn: vi.fn(),
     error: vi.fn(),
   },
+  whatsappLogger: {
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
+  agentLogger: {
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
 }));
 
 // Mock db

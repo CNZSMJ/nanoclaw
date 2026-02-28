@@ -8,6 +8,12 @@ vi.mock('./logger.js', () => ({
     warn: vi.fn(),
     error: vi.fn(),
   },
+  agentLogger: {
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
 }));
 
 // Mock child_process — store the mock fn so tests can configure it
@@ -23,7 +29,7 @@ import {
   ensureContainerRuntimeRunning,
   cleanupOrphans,
 } from './container-runtime.js';
-import { logger } from './logger.js';
+import { agentLogger } from './logger.js';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -59,7 +65,7 @@ describe('ensureContainerRuntimeRunning', () => {
       stdio: 'pipe',
       timeout: 10000,
     });
-    expect(logger.debug).toHaveBeenCalledWith(
+    expect(agentLogger.debug).toHaveBeenCalledWith(
       'Container runtime already running',
     );
   });
@@ -72,7 +78,7 @@ describe('ensureContainerRuntimeRunning', () => {
     expect(() => ensureContainerRuntimeRunning()).toThrow(
       'Container runtime is required but failed to start',
     );
-    expect(logger.error).toHaveBeenCalled();
+    expect(agentLogger.error).toHaveBeenCalled();
   });
 });
 
@@ -101,7 +107,7 @@ describe('cleanupOrphans', () => {
       `${CONTAINER_RUNTIME_BIN} stop nanoclaw-group2-222`,
       { stdio: 'pipe' },
     );
-    expect(logger.info).toHaveBeenCalledWith(
+    expect(agentLogger.info).toHaveBeenCalledWith(
       { count: 2, names: ['nanoclaw-group1-111', 'nanoclaw-group2-222'] },
       'Stopped orphaned containers',
     );
@@ -113,7 +119,7 @@ describe('cleanupOrphans', () => {
     cleanupOrphans();
 
     expect(mockExecSync).toHaveBeenCalledTimes(1);
-    expect(logger.info).not.toHaveBeenCalled();
+    expect(agentLogger.info).not.toHaveBeenCalled();
   });
 
   it('warns and continues when ps fails', () => {
@@ -123,7 +129,7 @@ describe('cleanupOrphans', () => {
 
     cleanupOrphans(); // should not throw
 
-    expect(logger.warn).toHaveBeenCalledWith(
+    expect(agentLogger.warn).toHaveBeenCalledWith(
       expect.objectContaining({ err: expect.any(Error) }),
       'Failed to clean up orphaned containers',
     );
@@ -141,7 +147,7 @@ describe('cleanupOrphans', () => {
     cleanupOrphans(); // should not throw
 
     expect(mockExecSync).toHaveBeenCalledTimes(3);
-    expect(logger.info).toHaveBeenCalledWith(
+    expect(agentLogger.info).toHaveBeenCalledWith(
       { count: 2, names: ['nanoclaw-a-1', 'nanoclaw-b-2'] },
       'Stopped orphaned containers',
     );

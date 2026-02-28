@@ -4,7 +4,7 @@
  */
 import { execSync } from 'child_process';
 
-import { logger } from './logger.js';
+import { agentLogger as logger } from './logger.js';
 
 /** The container runtime binary name. */
 export const CONTAINER_RUNTIME_BIN = 'docker';

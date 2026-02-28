@@ -40,7 +40,7 @@ import { startIpcWatcher } from './ipc.js';
 import { findChannel, formatMessages, formatOutbound } from './router.js';
 import { startSchedulerLoop } from './task-scheduler.js';
 import { Channel, NewMessage, RegisteredGroup } from './types.js';
-import { logger } from './logger.js';
+import { logger, agentLogger } from './logger.js';
 
 // Re-export for backwards compatibility during refactor
 export { escapeXml, formatMessages } from './router.js';
@@ -136,7 +136,7 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
 
   const channel = findChannel(channels, chatJid);
   if (!channel) {
-    logger.warn({ chatJid }, 'No channel owns JID, skipping messages');
+    agentLogger.warn({ chatJid }, 'No channel owns JID, skipping messages');
     return true;
   }
 
@@ -168,7 +168,7 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
     missedMessages[missedMessages.length - 1].timestamp;
   saveState();
 
-  logger.info(
+  agentLogger.info(
     { group: group.name, messageCount: missedMessages.length },
     'Processing messages',
   );
@@ -179,7 +179,7 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   const resetIdleTimer = () => {
     if (idleTimer) clearTimeout(idleTimer);
     idleTimer = setTimeout(() => {
-      logger.debug(
+      agentLogger.debug(
         { group: group.name },
         'Idle timeout, closing container stdin',
       );
@@ -200,7 +200,7 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
           : JSON.stringify(result.result);
       // Strip <internal>...</internal> blocks — agent uses these for internal reasoning
       const text = raw.replace(/<internal>[\s\S]*?<\/internal>/g, '').trim();
-      logger.info({ group: group.name }, `Agent output: ${raw.slice(0, 200)}`);
+      agentLogger.info({ group: group.name }, `Agent output: ${raw.slice(0, 200)}`);
       if (text) {
         await channel.sendMessage(chatJid, text);
         outputSentToUser = true;
@@ -225,7 +225,7 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
     // If we already sent output to the user, don't roll back the cursor —
     // the user got their response and re-processing would send duplicates.
     if (outputSentToUser) {
-      logger.warn(
+      agentLogger.warn(
         { group: group.name },
         'Agent error after output was sent, skipping cursor rollback to prevent duplicates',
       );
@@ -234,7 +234,7 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
     // Roll back cursor so retries can re-process these messages
     lastAgentTimestamp[chatJid] = previousCursor;
     saveState();
-    logger.warn(
+    agentLogger.warn(
       { group: group.name },
       'Agent error, rolled back message cursor for retry',
     );
@@ -281,12 +281,12 @@ async function runAgent(
   // Wrap onOutput to track session ID from streamed results
   const wrappedOnOutput = onOutput
     ? async (output: ContainerOutput) => {
-        if (output.newSessionId) {
-          sessions[group.folder] = output.newSessionId;
-          setSession(group.folder, output.newSessionId);
-        }
-        await onOutput(output);
+      if (output.newSessionId) {
+        sessions[group.folder] = output.newSessionId;
+        setSession(group.folder, output.newSessionId);
       }
+      await onOutput(output);
+    }
     : undefined;
 
   try {
@@ -311,7 +311,7 @@ async function runAgent(
     }
 
     if (output.status === 'error') {
-      logger.error(
+      agentLogger.error(
         { group: group.name, error: output.error },
         'Container agent error',
       );
@@ -320,7 +320,7 @@ async function runAgent(
 
     return 'success';
   } catch (err) {
-    logger.error({ group: group.name, err }, 'Agent error');
+    agentLogger.error({ group: group.name, err }, 'Agent error');
     return 'error';
   }
 }
@@ -344,7 +344,7 @@ async function startMessageLoop(): Promise<void> {
       );
 
       if (messages.length > 0) {
-        logger.info({ count: messages.length }, 'New messages');
+        agentLogger.info({ count: messages.length }, 'New unprocessed messages detected');
 
         // Advance the "seen" cursor for all messages immediately
         lastTimestamp = newTimestamp;
@@ -367,7 +367,7 @@ async function startMessageLoop(): Promise<void> {
 
           const channel = findChannel(channels, chatJid);
           if (!channel) {
-            logger.warn({ chatJid }, 'No channel owns JID, skipping messages');
+            agentLogger.warn({ chatJid }, 'No channel owns JID, skipping messages');
             continue;
           }
 
@@ -396,7 +396,7 @@ async function startMessageLoop(): Promise<void> {
           const formatted = formatMessages(messagesToSend);
 
           if (queue.sendMessage(chatJid, formatted)) {
-            logger.debug(
+            agentLogger.debug(
               { chatJid, count: messagesToSend.length },
               'Piped messages to active container',
             );
@@ -407,7 +407,7 @@ async function startMessageLoop(): Promise<void> {
             channel
               .setTyping?.(chatJid, true)
               ?.catch((err) =>
-                logger.warn({ chatJid, err }, 'Failed to set typing indicator'),
+                agentLogger.warn({ chatJid, err }, 'Failed to set typing indicator'),
               );
           } else {
             // No active container — enqueue for a new one
@@ -416,7 +416,7 @@ async function startMessageLoop(): Promise<void> {
         }
       }
     } catch (err) {
-      logger.error({ err }, 'Error in message loop');
+      agentLogger.error({ err }, 'Error in message loop');
     }
     await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL));
   }
@@ -431,7 +431,7 @@ function recoverPendingMessages(): void {
     const sinceTimestamp = lastAgentTimestamp[chatJid] || '';
     const pending = getMessagesSince(chatJid, sinceTimestamp, ASSISTANT_NAME);
     if (pending.length > 0) {
-      logger.info(
+      agentLogger.info(
         { group: group.name, pendingCount: pending.length },
         'Recovery: found unprocessed messages',
       );
@@ -522,7 +522,7 @@ async function main(): Promise<void> {
 const isDirectRun =
   process.argv[1] &&
   new URL(import.meta.url).pathname ===
-    new URL(`file://${process.argv[1]}`).pathname;
+  new URL(`file://${process.argv[1]}`).pathname;
 
 if (isDirectRun) {
   main().catch((err) => {
