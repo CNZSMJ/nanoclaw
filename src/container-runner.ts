@@ -196,6 +196,18 @@ function buildVolumeMounts(
     mounts.push(...validatedMounts);
   }
 
+  // Global MCP configuration: mount the project's .mcp.json so it's accessible.
+  // Although only main group can edit project files, all groups should be able
+  // to read the global .mcp.json.
+  const globalMcpFile = path.join(projectRoot, '.mcp.json');
+  if (fs.existsSync(globalMcpFile)) {
+    mounts.push({
+      hostPath: globalMcpFile,
+      containerPath: path.posix.join('/workspace/global', '.mcp.json'),
+      readonly: true,
+    });
+  }
+
   return mounts;
 }
 
@@ -370,9 +382,13 @@ export async function runContainerAgent(
 
     container.stderr.on('data', (data) => {
       const chunk = data.toString();
-      const lines = chunk.trim().split('\n');
+      const lines = chunk.split('\n');
       for (const line of lines) {
-        if (line) logger.debug({ container: group.folder }, line);
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        // Stream agent-runner log lines in real-time at info level so they
+        // appear immediately in agent.log rather than being dumped on exit.
+        logger.info({ group: group.name }, trimmed);
       }
       // Don't reset timeout on stderr — SDK writes debug logs continuously.
       // Timeout only resets on actual output (OUTPUT_MARKER in stdout).
