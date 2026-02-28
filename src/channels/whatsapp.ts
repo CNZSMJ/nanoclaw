@@ -241,22 +241,32 @@ export class WhatsAppChannel implements Channel {
       ? text
       : `${ASSISTANT_NAME}: ${text}`;
 
+    const preview =
+      prefixed.length > 50
+        ? prefixed.slice(0, 50).replace(/\n/g, ' ') + '...'
+        : prefixed.replace(/\n/g, ' ');
+
     if (!this.connected) {
       this.outgoingQueue.push({ jid, text: prefixed });
       logger.info(
-        { jid, length: prefixed.length, queueSize: this.outgoingQueue.length },
+        {
+          jid,
+          length: prefixed.length,
+          preview,
+          queueSize: this.outgoingQueue.length,
+        },
         'WA disconnected, message queued',
       );
       return;
     }
     try {
       await this.sock.sendMessage(jid, { text: prefixed });
-      logger.info({ jid, length: prefixed.length }, 'Message sent');
+      logger.info({ jid, length: prefixed.length, preview }, 'Message sent');
     } catch (err) {
       // If send fails, queue it for retry on reconnect
       this.outgoingQueue.push({ jid, text: prefixed });
       logger.warn(
-        { jid, err, queueSize: this.outgoingQueue.length },
+        { jid, err, preview, queueSize: this.outgoingQueue.length },
         'Failed to send, message queued',
       );
     }
@@ -364,10 +374,14 @@ export class WhatsAppChannel implements Channel {
       );
       while (this.outgoingQueue.length > 0) {
         const item = this.outgoingQueue.shift()!;
+        const preview =
+          item.text.length > 50
+            ? item.text.slice(0, 50).replace(/\n/g, ' ') + '...'
+            : item.text.replace(/\n/g, ' ');
         // Send directly — queued items are already prefixed by sendMessage
         await this.sock.sendMessage(item.jid, { text: item.text });
         logger.info(
-          { jid: item.jid, length: item.text.length },
+          { jid: item.jid, length: item.text.length, preview },
           'Queued message sent',
         );
       }
