@@ -200,7 +200,10 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
           : JSON.stringify(result.result);
       // Strip <internal>...</internal> blocks — agent uses these for internal reasoning
       const text = raw.replace(/<internal>[\s\S]*?<\/internal>/g, '').trim();
-      agentLogger.info({ group: group.name }, `Agent output: ${raw.slice(0, 200)}`);
+      agentLogger.info(
+        { group: group.name },
+        `Agent output: ${raw.slice(0, 200)}`,
+      );
       if (text) {
         await channel.sendMessage(chatJid, text);
         outputSentToUser = true;
@@ -281,12 +284,12 @@ async function runAgent(
   // Wrap onOutput to track session ID from streamed results
   const wrappedOnOutput = onOutput
     ? async (output: ContainerOutput) => {
-      if (output.newSessionId) {
-        sessions[group.folder] = output.newSessionId;
-        setSession(group.folder, output.newSessionId);
+        if (output.newSessionId) {
+          sessions[group.folder] = output.newSessionId;
+          setSession(group.folder, output.newSessionId);
+        }
+        await onOutput(output);
       }
-      await onOutput(output);
-    }
     : undefined;
 
   try {
@@ -344,7 +347,10 @@ async function startMessageLoop(): Promise<void> {
       );
 
       if (messages.length > 0) {
-        agentLogger.info({ count: messages.length }, 'New unprocessed messages detected');
+        agentLogger.info(
+          { count: messages.length },
+          'New unprocessed messages detected',
+        );
 
         // Advance the "seen" cursor for all messages immediately
         lastTimestamp = newTimestamp;
@@ -367,7 +373,10 @@ async function startMessageLoop(): Promise<void> {
 
           const channel = findChannel(channels, chatJid);
           if (!channel) {
-            agentLogger.warn({ chatJid }, 'No channel owns JID, skipping messages');
+            agentLogger.warn(
+              { chatJid },
+              'No channel owns JID, skipping messages',
+            );
             continue;
           }
 
@@ -407,7 +416,10 @@ async function startMessageLoop(): Promise<void> {
             channel
               .setTyping?.(chatJid, true)
               ?.catch((err) =>
-                agentLogger.warn({ chatJid, err }, 'Failed to set typing indicator'),
+                agentLogger.warn(
+                  { chatJid, err },
+                  'Failed to set typing indicator',
+                ),
               );
           } else {
             // No active container — enqueue for a new one
@@ -522,7 +534,7 @@ async function main(): Promise<void> {
 const isDirectRun =
   process.argv[1] &&
   new URL(import.meta.url).pathname ===
-  new URL(`file://${process.argv[1]}`).pathname;
+    new URL(`file://${process.argv[1]}`).pathname;
 
 if (isDirectRun) {
   main().catch((err) => {

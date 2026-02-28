@@ -43,7 +43,12 @@ export const agentLogger = pino({
 // (e.g. "Closing session: SessionEntry {...}" which bypasses pino)
 const originalConsoleLog = console.log;
 console.log = (...args: unknown[]) => {
-  whatsappLogger.debug({ source: 'console' }, args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '));
+  whatsappLogger.debug(
+    { source: 'console' },
+    args
+      .map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a)))
+      .join(' '),
+  );
 };
 
 // Route uncaught errors through pino so they get timestamps in stderr
