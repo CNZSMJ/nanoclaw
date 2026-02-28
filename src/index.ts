@@ -465,11 +465,13 @@ async function main(): Promise<void> {
   loadState();
 
   // Graceful shutdown handlers
-  const shutdown = async (signal: string) => {
-    logger.info({ signal }, 'Shutdown signal received');
+  const shutdown = (signal: string) => {
+    logger.info({ signal }, 'Shutdown signal received, exiting immediately');
     isShuttingDown = true; // Signal the message loop to stop
-    await queue.shutdown(10000);
-    for (const ch of channels) await ch.disconnect();
+    // Exit immediately so the OS closes the WA socket. Waiting for
+    // Baileys protocol-level disconnect() is unreliable (conflict errors
+    // swallow the 'connection:close' event) and causes the old process to
+    // keep polling and spawning duplicate agent containers during restart.
     process.exit(0);
   };
   process.on('SIGTERM', () => shutdown('SIGTERM'));
