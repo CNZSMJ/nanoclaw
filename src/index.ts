@@ -50,6 +50,7 @@ let sessions: Record<string, string> = {};
 let registeredGroups: Record<string, RegisteredGroup> = {};
 let lastAgentTimestamp: Record<string, string> = {};
 let messageLoopRunning = false;
+let isShuttingDown = false;
 
 let whatsapp: WhatsAppChannel;
 const channels: Channel[] = [];
@@ -337,7 +338,7 @@ async function startMessageLoop(): Promise<void> {
 
   logger.info(`NanoClaw running (trigger: @${ASSISTANT_NAME})`);
 
-  while (true) {
+  while (!isShuttingDown) {
     try {
       const jids = Object.keys(registeredGroups);
       const { messages, newTimestamp } = getNewMessages(
@@ -466,6 +467,7 @@ async function main(): Promise<void> {
   // Graceful shutdown handlers
   const shutdown = async (signal: string) => {
     logger.info({ signal }, 'Shutdown signal received');
+    isShuttingDown = true; // Signal the message loop to stop
     await queue.shutdown(10000);
     for (const ch of channels) await ch.disconnect();
     process.exit(0);

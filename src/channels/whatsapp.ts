@@ -282,7 +282,18 @@ export class WhatsAppChannel implements Channel {
 
   async disconnect(): Promise<void> {
     this.connected = false;
-    this.sock?.end(undefined);
+    // Wait for WA server to confirm close before returning.
+    // This prevents session conflicts when a new instance starts immediately after shutdown.
+    await new Promise<void>((resolve) => {
+      const timeout = setTimeout(resolve, 2000);
+      this.sock?.ev.on('connection.update', ({ connection }) => {
+        if (connection === 'close') {
+          clearTimeout(timeout);
+          resolve();
+        }
+      });
+      this.sock?.end(undefined);
+    });
   }
 
   async setTyping(jid: string, isTyping: boolean): Promise<void> {
