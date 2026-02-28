@@ -459,13 +459,47 @@ async function runQuery(
     const msgType = message.type === 'system' ? `system/${(message as { subtype?: string }).subtype}` : message.type;
     log(`[msg #${messageCount}] type=${msgType}`);
 
-    if (message.type === 'assistant' && 'uuid' in message) {
-      lastAssistantUuid = (message as { uuid: string }).uuid;
+    if (message.type === 'assistant') {
+      const astMsg = message as any; // Cast as any to avoid complex TS types from SDK
+      if ('uuid' in message) {
+        lastAssistantUuid = astMsg.uuid;
+      }
+
+      if (astMsg.message?.content && Array.isArray(astMsg.message.content)) {
+        const texts = astMsg.message.content
+          .filter((c: any) => c.type === 'text')
+          .map((c: any) => c.text);
+        const tools = astMsg.message.content
+          .filter((c: any) => c.type === 'tool_use')
+          .map((c: any) => c.name);
+
+        if (texts.length > 0) {
+          log(`[Assistant Thinking] ${texts.join('').slice(0, 500).replace(/\n/g, ' ')}${texts.join('').length > 500 ? '...' : ''}`);
+        }
+        if (tools.length > 0) {
+          log(`[Assistant Tool Request] ${tools.join(', ')}`);
+        }
+      }
+    }
+
+    if (message.type === 'tool_progress') {
+      const tpMsg = message as any;
+      log(`[Tool Executed] ${tpMsg.tool_name} took ${tpMsg.elapsed_time_seconds}s`);
+    }
+
+    if (message.type === 'tool_use_summary') {
+      const tsMsg = message as any;
+      log(`[Tool Summary] ${tsMsg.summary}`);
     }
 
     if (message.type === 'system' && message.subtype === 'init') {
       newSessionId = message.session_id;
       log(`Session initialized: ${newSessionId}`);
+    }
+
+    if (message.type === 'system' && message.subtype === 'compact_boundary') {
+      const cbMsg = message as any;
+      log(`[Context Compacted] trigger: ${cbMsg.compact_metadata?.trigger}, pre_tokens: ${cbMsg.compact_metadata?.pre_tokens}`);
     }
 
     if (message.type === 'system' && (message as { subtype?: string }).subtype === 'task_notification') {
@@ -477,6 +511,13 @@ async function runQuery(
       resultCount++;
       const textResult = 'result' in message ? (message as { result?: string }).result : null;
       log(`Result #${resultCount}: subtype=${message.subtype}${textResult ? ` text=${textResult.slice(0, 200)}` : ''}`);
+
+      const resMsg = message as any;
+      log(`[Query Metrics] turns: ${resMsg.num_turns}, total_time: ${resMsg.duration_ms}ms, api_time: ${resMsg.duration_api_ms}ms`);
+      if (resMsg.usage) {
+        log(`[Token Usage] in: ${resMsg.usage.inputTokens}, out: ${resMsg.usage.outputTokens}, cache_read: ${resMsg.usage.cacheReadInputTokens || 0}, cache_write: ${resMsg.usage.cacheCreationInputTokens || 0}, cost: $${resMsg.total_cost_usd?.toFixed(4)}`);
+      }
+
       writeOutput({
         status: 'success',
         result: textResult || null,
