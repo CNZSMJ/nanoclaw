@@ -291,7 +291,7 @@ export async function runContainerAgent(
     'Container mount configuration',
   );
 
-  logger.info(
+  logger.debug(
     {
       group: group.name,
       containerName,
@@ -388,7 +388,7 @@ export async function runContainerAgent(
         if (!trimmed) continue;
         // Stream agent-runner log lines in real-time at info level so they
         // appear immediately in agent.log rather than being dumped on exit.
-        logger.info({ group: group.name }, trimmed);
+        logger.info(trimmed);
       }
       // Don't reset timeout on stderr — SDK writes debug logs continuously.
       // Timeout only resets on actual output (OUTPUT_MARKER in stdout).

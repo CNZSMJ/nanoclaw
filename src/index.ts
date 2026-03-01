@@ -169,11 +169,6 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
     missedMessages[missedMessages.length - 1].timestamp;
   saveState();
 
-  agentLogger.info(
-    { group: group.name, messageCount: missedMessages.length },
-    'Processing messages',
-  );
-
   // Track idle timer for closing stdin when agent is idle
   let idleTimer: ReturnType<typeof setTimeout> | null = null;
 
