@@ -348,11 +348,6 @@ async function startMessageLoop(): Promise<void> {
       );
 
       if (messages.length > 0) {
-        agentLogger.info(
-          { count: messages.length },
-          'New unprocessed messages detected',
-        );
-
         // Advance the "seen" cursor for all messages immediately
         lastTimestamp = newTimestamp;
         saveState();
@@ -381,6 +376,16 @@ async function startMessageLoop(): Promise<void> {
             continue;
           }
 
+          // Log each incoming message as an audit entry.
+          const pid = process.pid;
+          for (const m of groupMessages) {
+            const preview =
+              m.content.slice(0, 60) + (m.content.length > 60 ? '...' : '');
+            agentLogger.info(
+              `[Orchestrator(${pid})] [${group.name}] Incoming: "${preview}" (from ${m.sender_name})`,
+            );
+          }
+
           const isMainGroup = group.folder === MAIN_GROUP_FOLDER;
           const needsTrigger = !isMainGroup && group.requiresTrigger !== false;
 
@@ -391,7 +396,12 @@ async function startMessageLoop(): Promise<void> {
             const hasTrigger = groupMessages.some((m) =>
               TRIGGER_PATTERN.test(m.content.trim()),
             );
-            if (!hasTrigger) continue;
+            if (!hasTrigger) {
+              agentLogger.info(
+                `[Orchestrator(${pid})] [${group.name}] Outcome: Discarded (no trigger keyword)`,
+              );
+              continue;
+            }
           }
 
           // Pull all messages since lastAgentTimestamp so non-trigger
@@ -405,10 +415,10 @@ async function startMessageLoop(): Promise<void> {
             allPending.length > 0 ? allPending : groupMessages;
           const formatted = formatMessages(messagesToSend);
 
+          const pid2 = process.pid;
           if (queue.sendMessage(chatJid, formatted)) {
-            agentLogger.debug(
-              { chatJid, count: messagesToSend.length },
-              'Piped messages to active container',
+            agentLogger.info(
+              `[Orchestrator(${pid2})] [${group.name}] Routing: Piped ${messagesToSend.length} message(s) to active Agent`,
             );
             lastAgentTimestamp[chatJid] =
               messagesToSend[messagesToSend.length - 1].timestamp;
@@ -424,6 +434,9 @@ async function startMessageLoop(): Promise<void> {
               );
           } else {
             // No active container — enqueue for a new one
+            agentLogger.info(
+              `[Orchestrator(${pid2})] [${group.name}] Routing: Enqueued (no active Agent, spawning new)`,
+            );
             queue.enqueueMessageCheck(chatJid);
           }
         }

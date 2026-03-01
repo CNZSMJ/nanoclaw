@@ -390,6 +390,8 @@ async function runQuery(
   let lastAssistantUuid: string | undefined;
   let messageCount = 0;
   let resultCount = 0;
+  let turnCount = 0;
+  const agentTag = `[Agent(${process.pid})]`;
 
   // Load global CLAUDE.md as additional system context (shared across all groups)
   const globalClaudeMdPath = '/workspace/global/CLAUDE.md';
@@ -456,8 +458,8 @@ async function runQuery(
     }
   })) {
     messageCount++;
-    const msgType = message.type === 'system' ? `system/${(message as { subtype?: string }).subtype}` : message.type;
-    log(`[msg #${messageCount}] type=${msgType}`);
+    // const msgType = message.type === 'system' ? `system/${(message as { subtype?: string }).subtype}` : message.type;
+    // log(`[msg #${messageCount}] type=${msgType}`);
 
     if (message.type === 'assistant') {
       const astMsg = message as any; // Cast as any to avoid complex TS types from SDK
@@ -469,53 +471,59 @@ async function runQuery(
         const texts = astMsg.message.content
           .filter((c: any) => c.type === 'text')
           .map((c: any) => c.text);
-        const tools = astMsg.message.content
-          .filter((c: any) => c.type === 'tool_use')
-          .map((c: any) => c.name);
+        const toolUses = astMsg.message.content
+          .filter((c: any) => c.type === 'tool_use');
 
-        if (texts.length > 0) {
-          log(`[Assistant Thinking] ${texts.join('').slice(0, 500).replace(/\n/g, ' ')}${texts.join('').length > 500 ? '...' : ''}`);
+        if (texts.length > 0 || toolUses.length > 0) {
+          turnCount++;
+          log(`${agentTag} >> Turn ${turnCount}`);
         }
-        if (tools.length > 0) {
-          log(`[Assistant Tool Request] ${tools.join(', ')}`);
+        if (texts.length > 0) {
+          const thinking = texts.join('').replace(/\n/g, ' ').slice(0, 300);
+          log(`${agentTag}    Thinking: ${thinking}${texts.join('').length > 300 ? '...' : ''}`);
+        }
+        for (const tool of toolUses) {
+          const inputPreview = JSON.stringify(tool.input || {}).slice(0, 80);
+          log(`${agentTag}    Call Tool: ${tool.name} ${inputPreview}`);
         }
       }
     }
 
     if (message.type === 'tool_progress') {
       const tpMsg = message as any;
-      log(`[Tool Executed] ${tpMsg.tool_name} took ${tpMsg.elapsed_time_seconds}s`);
+      const elapsed = tpMsg.elapsed_time_seconds?.toFixed(1) ?? '?';
+      log(`${agentTag} .. Tool Progress: ${tpMsg.tool_name} (${elapsed}s)`);
     }
 
     if (message.type === 'tool_use_summary') {
       const tsMsg = message as any;
-      log(`[Tool Summary] ${tsMsg.summary}`);
+      // Observation: show first 120 chars of tool result
+      const resultPreview = (tsMsg.summary || '').replace(/\n/g, ' ').slice(0, 120);
+      log(`${agentTag} << Observation: ${resultPreview}${tsMsg.summary?.length > 120 ? '...' : ''}`);
     }
 
     if (message.type === 'system' && message.subtype === 'init') {
       newSessionId = message.session_id;
-      log(`Session initialized: ${newSessionId}`);
+      log(`${agentTag} Session initialized: ${newSessionId}`);
     }
 
     if (message.type === 'system' && message.subtype === 'compact_boundary') {
       const cbMsg = message as any;
-      log(`[Context Compacted] trigger: ${cbMsg.compact_metadata?.trigger}, pre_tokens: ${cbMsg.compact_metadata?.pre_tokens}`);
+      log(`${agentTag} [Context Compacted] trigger: ${cbMsg.compact_metadata?.trigger}, pre_tokens: ${cbMsg.compact_metadata?.pre_tokens}`);
     }
 
     if (message.type === 'system' && (message as { subtype?: string }).subtype === 'task_notification') {
       const tn = message as { task_id: string; status: string; summary: string };
-      log(`Task notification: task=${tn.task_id} status=${tn.status} summary=${tn.summary}`);
+      log(`${agentTag} Task notification: task=${tn.task_id} status=${tn.status} summary=${tn.summary}`);
     }
 
     if (message.type === 'result') {
       resultCount++;
       const textResult = 'result' in message ? (message as { result?: string }).result : null;
-      log(`Result #${resultCount}: subtype=${message.subtype}${textResult ? ` text=${textResult.slice(0, 200)}` : ''}`);
-
       const resMsg = message as any;
-      log(`[Query Metrics] turns: ${resMsg.num_turns}, total_time: ${resMsg.duration_ms}ms, api_time: ${resMsg.duration_api_ms}ms`);
-      if (resMsg.usage) {
-        log(`[Token Usage] in: ${resMsg.usage.inputTokens}, out: ${resMsg.usage.outputTokens}, cache_read: ${resMsg.usage.cacheReadInputTokens || 0}, cache_write: ${resMsg.usage.cacheCreationInputTokens || 0}, cost: $${resMsg.total_cost_usd?.toFixed(4)}`);
+      log(`${agentTag} -- Query Completed (turns: ${resMsg.num_turns}, time: ${resMsg.duration_ms}ms, cost: $${resMsg.total_cost_usd?.toFixed(4)}) --`);
+      if (textResult) {
+        log(`${agentTag} Result: ${textResult.slice(0, 150).replace(/\n/g, ' ')}${textResult.length > 150 ? '...' : ''}`);
       }
 
       writeOutput({
