@@ -1,3 +1,15 @@
 {
-  "mcpServers": {}
+  "mcpServers": {
+    "memory": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-memory"
+      ]
+    },
+    "minimax": {
+      "command": "npx",
+      "args": ["-y", "@mcpcn/minimax-mcp-js"]
+    }
+  }
 }

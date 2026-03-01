@@ -227,6 +227,8 @@ function readSecrets(): Record<string, string> {
     'API_TIMEOUT_MS',
     'CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC',
     'CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS',
+    'MINIMAX_API_KEY',
+    'MINIMAX_API_HOST',
   ]);
 }
 

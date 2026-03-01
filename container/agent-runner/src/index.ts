@@ -416,6 +416,58 @@ async function runQuery(
     log(`Additional directories: ${extraDirs.join(', ')}`);
   }
 
+  // Dynamic MCP loading
+  const customMcpServers: Record<string, any> = {};
+  const mcpAllowedTools: string[] = [];
+
+  // 1. Read global MCP config
+  const globalMcpPath = '/workspace/global/.mcp.json';
+  log(`Checking for global MCP at: ${globalMcpPath}, exists: ${fs.existsSync(globalMcpPath)}`);
+  if (fs.existsSync(globalMcpPath)) {
+    try {
+      const content = fs.readFileSync(globalMcpPath, 'utf8');
+      log(`Global MCP file content: ${content.substring(0, 200)}`);
+      const globalConfig = JSON.parse(content);
+      if (globalConfig.mcpServers) {
+        log(`Found ${Object.keys(globalConfig.mcpServers).length} MCP servers in global config`);
+        Object.assign(customMcpServers, globalConfig.mcpServers);
+      }
+    } catch (err) {
+      log(`Failed to parse global .mcp.json: ${err}`);
+    }
+  }
+
+  // 2. Read group-specific MCP config
+  const localMcpPath = '/workspace/group/.claude/mcp.json';
+  if (fs.existsSync(localMcpPath)) {
+    try {
+      const localConfig = JSON.parse(fs.readFileSync(localMcpPath, 'utf8'));
+      if (localConfig.mcpServers) {
+        Object.assign(customMcpServers, localConfig.mcpServers);
+      }
+    } catch (err) {
+      log(`Failed to parse local mcp.json: ${err}`);
+    }
+  }
+
+  // Generate allowedTools for the loaded MCPs
+  for (const serverName of Object.keys(customMcpServers)) {
+    mcpAllowedTools.push(`mcp__${serverName}__*`);
+  }
+
+  // Inject secrets into MCP env (e.g., MINIMAX_API_KEY)
+  const mcpEnvVars = ['MINIMAX_API_KEY', 'MINIMAX_API_HOST'];
+  for (const serverName of Object.keys(customMcpServers)) {
+    const mcp = customMcpServers[serverName];
+    mcp.env = mcp.env || {};
+    for (const envVar of mcpEnvVars) {
+      if (sdkEnv[envVar]) {
+        mcp.env[envVar] = sdkEnv[envVar];
+      }
+    }
+  }
+  log(`Injected env vars into MCPs: ${mcpEnvVars.join(', ')}`);
+
   for await (const message of query({
     prompt: stream,
     options: {
@@ -434,7 +486,8 @@ async function runQuery(
         'TeamCreate', 'TeamDelete', 'SendMessage',
         'TodoWrite', 'ToolSearch', 'Skill',
         'NotebookEdit',
-        'mcp__nanoclaw__*'
+        'mcp__nanoclaw__*',
+        ...mcpAllowedTools
       ],
       env: sdkEnv,
       permissionMode: 'bypassPermissions',
@@ -450,6 +503,7 @@ async function runQuery(
             NANOCLAW_IS_MAIN: containerInput.isMain ? '1' : '0',
           },
         },
+        ...customMcpServers,
       },
       hooks: {
         PreCompact: [{ hooks: [createPreCompactHook(containerInput.assistantName)] }],
@@ -483,7 +537,7 @@ async function runQuery(
           log(`${agentTag}    Thinking: ${thinking}${texts.join('').length > 300 ? '...' : ''}`);
         }
         for (const tool of toolUses) {
-          const inputPreview = JSON.stringify(tool.input || {}).slice(0, 80);
+          const inputPreview = JSON.stringify(tool.input || {}).slice(0, 160);
           log(`${agentTag}    Call Tool: ${tool.name} ${inputPreview}`);
         }
       }
