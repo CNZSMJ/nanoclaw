@@ -197,8 +197,7 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
       // Strip <internal>...</internal> blocks — agent uses these for internal reasoning
       const text = raw.replace(/<internal>[\s\S]*?<\/internal>/g, '').trim();
       agentLogger.info(
-        { group: group.name },
-        `Agent output: ${raw.slice(0, 200)}`,
+        `[Orchestrator(${process.pid})] [${group.name}] Agent output: ${raw.slice(0, 200)}`,
       );
       if (text) {
         await channel.sendMessage(chatJid, text);
@@ -319,7 +318,10 @@ async function runAgent(
 
     return 'success';
   } catch (err) {
-    agentLogger.error({ group: group.name, err }, 'Agent error');
+    agentLogger.error(
+      { err },
+      `[Orchestrator(${process.pid})] [${group.name}] Agent error`,
+    );
     return 'error';
   }
 }
