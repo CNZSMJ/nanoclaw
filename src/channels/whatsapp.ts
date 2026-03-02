@@ -17,7 +17,9 @@ import {
   ASSISTANT_NAME,
   STORE_DIR,
   DATA_DIR,
+  GROUPS_DIR,
 } from '../config.js';
+import { resolveGroupFolderPath } from '../group-folder.js';
 import { getLastGroupSync, setLastGroupSync, updateChatName } from '../db.js';
 import { whatsappLogger as logger } from '../logger.js';
 import {
@@ -213,12 +215,13 @@ export class WhatsAppChannel implements Channel {
                 {},
                 {
                   logger,
-                  reuploadRequest: this.sock.updateMediaMessage
-                }
+                  reuploadRequest: this.sock.updateMediaMessage,
+                },
               );
 
-              const groupFolder = groups[chatJid].folder;
-              const imagesDir = path.join(DATA_DIR, 'sessions', groupFolder, 'images');
+              const group = groups[chatJid];
+              const groupFolderPath = resolveGroupFolderPath(group.folder);
+              const imagesDir = path.join(groupFolderPath, 'images');
               fs.mkdirSync(imagesDir, { recursive: true });
 
               const msgId = msg.key.id || `img_${Date.now()}`;
@@ -229,9 +232,15 @@ export class WhatsAppChannel implements Channel {
 
               const containerPath = `/workspace/group/images/${imageFilename}`;
               imageDescription = `\n[用户附带了一张图片，存放在：${containerPath}]`;
-              logger.info({ chatJid, imageFilename }, 'Downloaded image message');
+              logger.info(
+                { chatJid, imageFilename },
+                'Downloaded image message',
+              );
             } catch (err) {
-              logger.error({ err, chatJid }, 'Failed to download image message');
+              logger.error(
+                { err, chatJid },
+                'Failed to download image message',
+              );
             }
           }
 
