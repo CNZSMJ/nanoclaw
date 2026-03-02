@@ -52,13 +52,16 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
 WORKDIR /app
 
 # Copy package files first for better caching
-COPY agent-runner/package*.json ./
+COPY container/agent-runner/package*.json ./
 
 # Install dependencies
 RUN npm install
 
 # Copy source code
-COPY agent-runner/ ./
+COPY container/agent-runner/ ./
+
+# Copy skill MCP tools (baked into image as fallback)
+COPY .claude/skills/x-integration/agent.ts ./src/skills/x-integration/
 
 # Build TypeScript
 RUN npm run build
