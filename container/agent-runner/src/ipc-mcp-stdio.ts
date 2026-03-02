@@ -280,6 +280,27 @@ Use available_groups.json to find the JID for a group. The folder name should be
   },
 );
 
+// Register X-Integration tools from runtime-synced path
+const xSkillPath = '/home/node/.claude/skills/x-integration/agent.js';
+if (fs.existsSync(xSkillPath)) {
+  try {
+    const { createXTools } = await import(xSkillPath);
+    const xTools = createXTools({ groupFolder, isMain });
+    for (const t of xTools) {
+      // @ts-ignore - Map Agent SDK tool structure to MCP SDK tool structure
+      server.tool(t.name, t.description, t.inputSchema, async (args) => {
+        const result = await t.call(args);
+        return {
+          content: result.content,
+          isError: result.isError,
+        };
+      });
+    }
+  } catch (err) {
+    console.error(`Failed to load x-integration skill from ${xSkillPath}:`, err);
+  }
+}
+
 // Start the stdio transport
 const transport = new StdioServerTransport();
 await server.connect(transport);
