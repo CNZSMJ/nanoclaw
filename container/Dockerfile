@@ -67,7 +67,10 @@ COPY .claude/skills/x-integration/ ./src/skills/x-integration/
 RUN npm run build
 
 # Create workspace directories
-RUN mkdir -p /workspace/group /workspace/global /workspace/extra /workspace/ipc/messages /workspace/ipc/tasks /workspace/ipc/input
+RUN mkdir -p /workspace/group /workspace/global /workspace/extra /workspace/ipc/messages /workspace/ipc/tasks /workspace/ipc/input /home/node/.claude
+
+# Symlink node_modules to skills dir so dynamic imports can find dependencies
+RUN ln -s /app/node_modules /home/node/.claude/node_modules
 
 # Create entrypoint script
 # Optimization: Use pre-built dist instead of re-compiling at runtime
