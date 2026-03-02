@@ -3,7 +3,11 @@
 
 FROM node:22-slim
 
-# Install system dependencies for Chromium
+# Configure domestic apt mirrors (Debian Bookworm)
+RUN sed -i 's/deb.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list.d/debian.sources || \
+    sed -i 's/deb.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list
+
+# Install system dependencies for Chromium and Python
 RUN apt-get update && apt-get install -y \
     chromium \
     fonts-liberation \
@@ -23,7 +27,14 @@ RUN apt-get update && apt-get install -y \
     libxshmfence1 \
     curl \
     git \
+    python3 \
+    python3-pip \
+    python3-venv \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
+
+# Configure domestic pip mirror globally
+RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/ --break-system-packages || true
 
 # Set Chromium path for agent-browser
 ENV AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium
@@ -60,8 +71,13 @@ RUN mkdir -p /workspace/group /workspace/global /workspace/extra /workspace/ipc/
 # Follow-up messages arrive via IPC files in /workspace/ipc/input/
 RUN printf '#!/bin/bash\nset -e\ncd /app && npx tsc --outDir /tmp/dist 2>&1 >&2\nln -s /app/node_modules /tmp/dist/node_modules\nchmod -R a-w /tmp/dist\ncat > /tmp/input.json\nnode /tmp/dist/index.js < /tmp/input.json\n' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
-# Set ownership to node user (non-root) for writable directories
-RUN chown -R node:node /workspace && chmod 777 /home/node
+# Set permissions to node user (non-root) for writable directories
+# Including cache directories for npm and uv
+ENV UV_CACHE_DIR=/home/node/.cache/uv
+ENV npm_config_cache=/home/node/.npm
+RUN mkdir -p /home/node/.cache/uv /home/node/.npm && \
+    chown -R node:node /workspace /home/node && \
+    chmod 777 /home/node
 
 # Switch to non-root user (required for --dangerously-skip-permissions)
 USER node
