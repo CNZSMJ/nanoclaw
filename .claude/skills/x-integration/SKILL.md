@@ -18,6 +18,9 @@ Browser automation for X interactions via WhatsApp.
 | Reply | `x_reply` | Reply to tweets |
 | Retweet | `x_retweet` | Retweet without comment |
 | Quote | `x_quote` | Quote tweet with comment |
+| Search | `x_search` | Search for tweets using keywords or advanced queries |
+| Profile | `x_view_profile` | View a user's profile and fetch recent tweets by scrolling |
+| Read Tweet | `x_read_tweet` | Read a specific tweet and its replies |
 
 ## Prerequisites
 
@@ -149,7 +152,10 @@ Paths relative to project root:
     ├── like.ts       # Like tweet
     ├── reply.ts      # Reply to tweet
     ├── retweet.ts    # Retweet
-    └── quote.ts      # Quote tweet
+    ├── quote.ts      # Quote tweet
+    ├── search.ts     # Search tweets
+    ├── view_profile.ts # View profile and recent tweets
+    └── read_tweet.ts   # Read specific tweet and replies
 ```
 
 ### Integration Points
@@ -326,10 +332,28 @@ npx dotenv -e .env -- npx tsx .claude/skills/x-integration/scripts/setup.ts
 echo '{"content":"Test tweet - please ignore"}' | npx dotenv -e .env -- npx tsx .claude/skills/x-integration/scripts/post.ts
 ```
 
-### Test Like
+### Test Quote
 
 ```bash
-echo '{"tweetUrl":"https://x.com/user/status/123"}' | npx dotenv -e .env -- npx tsx .claude/skills/x-integration/scripts/like.ts
+echo '{"tweetUrl":"https://x.com/user/status/123", "comment":"Cool"}' | npx dotenv -e .env -- npx tsx .claude/skills/x-integration/scripts/quote.ts
+```
+
+### Test Search
+
+```bash
+echo '{"query":"from:elonmusk AI"}' | npx dotenv -e .env -- npx tsx .claude/skills/x-integration/scripts/search.ts
+```
+
+### Test View Profile
+
+```bash
+echo '{"username":"elonmusk", "maxTweets":5}' | npx dotenv -e .env -- npx tsx .claude/skills/x-integration/scripts/view_profile.ts
+```
+
+### Test Read Tweet
+
+```bash
+echo '{"tweetUrl":"https://x.com/user/status/123"}' | npx dotenv -e .env -- npx tsx .claude/skills/x-integration/scripts/read_tweet.ts
 ```
 
 Or export `CHROME_PATH` manually before running:

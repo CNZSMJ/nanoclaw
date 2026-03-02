@@ -145,6 +145,30 @@ export async function handleXIpc(
       result = await runScript('quote', { tweetUrl: data.tweetUrl, comment: data.comment });
       break;
 
+    case 'x_search':
+      if (!data.query) {
+        result = { success: false, message: 'Missing query' };
+        break;
+      }
+      result = await runScript('search', { query: data.query });
+      break;
+
+    case 'x_view_profile':
+      if (!data.username) {
+        result = { success: false, message: 'Missing username' };
+        break;
+      }
+      result = await runScript('view_profile', { username: data.username, maxTweets: data.maxTweets || 5 });
+      break;
+
+    case 'x_read_tweet':
+      if (!data.tweetUrl) {
+        result = { success: false, message: 'Missing tweetUrl' };
+        break;
+      }
+      result = await runScript('read_tweet', { tweetUrl: data.tweetUrl });
+      break;
+
     default:
       return false;
   }

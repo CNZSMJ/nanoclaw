@@ -29,7 +29,7 @@ function writeIpcFile(dir: string, data: object): string {
   return filename;
 }
 
-async function waitForResult(requestId: string, maxWait = 60000): Promise<{ success: boolean; message: string }> {
+async function waitForResult(requestId: string, maxWait = 60000): Promise<{ success: boolean; message: string; data?: unknown }> {
   const resultFile = path.join(RESULTS_DIR, `${requestId}.json`);
   const pollInterval = 1000;
   let elapsed = 0;
@@ -235,6 +235,108 @@ Retweet with your own comment added.`,
         const result = await waitForResult(requestId);
         return {
           content: [{ type: 'text', text: result.message }],
+          isError: !result.success
+        };
+      }
+    ),
+
+    tool(
+      'x_search',
+      `Search for tweets on X (Twitter). Main group only.
+
+Search for a specific query and return the top results.`,
+      {
+        query: z.string().describe('The search query (e.g., "AI", "from:elonmusk", "#tech")')
+      },
+      async (args: { query: string }) => {
+        if (!isMain) {
+          return {
+            content: [{ type: 'text', text: 'Only the main group can interact with X.' }],
+            isError: true
+          };
+        }
+
+        const requestId = `xsearch-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        writeIpcFile(TASKS_DIR, {
+          type: 'x_search',
+          requestId,
+          query: args.query,
+          groupFolder,
+          timestamp: new Date().toISOString()
+        });
+
+        const result = await waitForResult(requestId);
+        return {
+          content: [{ type: 'text', text: result.data ? JSON.stringify(result.data, null, 2) : result.message }],
+          isError: !result.success
+        };
+      }
+    ),
+
+    tool(
+      'x_view_profile',
+      `View a user's profile on X (Twitter) and read their recent tweets. Main group only.
+
+Provide the username (handle without @) and optionally the number of recent tweets to read.`,
+      {
+        username: z.string().describe('The X username/handle (e.g., "elonmusk" without the @)'),
+        max_tweets: z.number().int().min(1).max(50).optional().describe('Number of recent tweets to fetch (default: 5, max 50)')
+      },
+      async (args: { username: string; max_tweets?: number }) => {
+        if (!isMain) {
+          return {
+            content: [{ type: 'text', text: 'Only the main group can interact with X.' }],
+            isError: true
+          };
+        }
+
+        const requestId = `xprofile-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        writeIpcFile(TASKS_DIR, {
+          type: 'x_view_profile',
+          requestId,
+          username: args.username,
+          maxTweets: args.max_tweets || 5,
+          groupFolder,
+          timestamp: new Date().toISOString()
+        });
+
+        const result = await waitForResult(requestId);
+        // We stringify result.data which contains profile info and the tweets list
+        return {
+          content: [{ type: 'text', text: result.data ? JSON.stringify(result.data, null, 2) : result.message }],
+          isError: !result.success
+        };
+      }
+    ),
+
+    tool(
+      'x_read_tweet',
+      `Read a specific tweet and its replies on X (Twitter). Main group only.
+
+Provide the tweet URL to fetch the main content and its top replies.`,
+      {
+        tweet_url: z.string().describe('The tweet URL or ID to read')
+      },
+      async (args: { tweet_url: string }) => {
+        if (!isMain) {
+          return {
+            content: [{ type: 'text', text: 'Only the main group can interact with X.' }],
+            isError: true
+          };
+        }
+
+        const requestId = `xread-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        writeIpcFile(TASKS_DIR, {
+          type: 'x_read_tweet',
+          requestId,
+          tweetUrl: args.tweet_url,
+          groupFolder,
+          timestamp: new Date().toISOString()
+        });
+
+        const result = await waitForResult(requestId);
+        return {
+          content: [{ type: 'text', text: result.data ? JSON.stringify(result.data, null, 2) : result.message }],
           isError: !result.success
         };
       }
