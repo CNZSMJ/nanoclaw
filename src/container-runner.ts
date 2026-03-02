@@ -144,6 +144,18 @@ function buildVolumeMounts(
       fs.cpSync(srcDir, dstDir, { recursive: true });
     }
   }
+
+  // Also sync skills from project .claude/skills/
+  const projectSkillsSrc = path.join(projectRoot, '.claude', 'skills');
+  if (fs.existsSync(projectSkillsSrc)) {
+    for (const skillDir of fs.readdirSync(projectSkillsSrc)) {
+      const srcDir = path.join(projectSkillsSrc, skillDir);
+      if (!fs.statSync(srcDir).isDirectory()) continue;
+      const dstDir = path.join(skillsDst, skillDir);
+      fs.cpSync(srcDir, dstDir, { recursive: true });
+    }
+  }
+
   mounts.push({
     hostPath: groupSessionsDir,
     containerPath: '/home/node/.claude',

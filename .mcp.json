@@ -8,8 +8,10 @@
       ]
     },
     "minimax": {
-      "command": "npx",
-      "args": ["-y", "@mcpcn/minimax-mcp-js"]
+      "command": "uvx",
+      "args": [
+        "minimax-coding-plan-mcp"
+      ]
     }
   }
 }
