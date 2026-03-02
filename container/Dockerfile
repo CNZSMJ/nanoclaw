@@ -82,6 +82,9 @@ RUN mkdir -p /home/node/.cache/uv /home/node/.npm && \
 # Switch to non-root user (required for --dangerously-skip-permissions)
 USER node
 
+# Pre-install minimax-coding-plan-mcp for offline use
+RUN uv tool install minimax-coding-plan-mcp
+
 # Set working directory to group workspace
 WORKDIR /workspace/group
 
