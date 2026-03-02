@@ -496,7 +496,7 @@ async function runQuery(
       mcpServers: {
         nanoclaw: {
           command: 'node',
-          args: [mcpServerPath],
+          args: ['--experimental-strip-types', '--no-warnings', mcpServerPath],
           env: {
             NANOCLAW_CHAT_JID: containerInput.chatJid,
             NANOCLAW_GROUP_FOLDER: containerInput.groupFolder,

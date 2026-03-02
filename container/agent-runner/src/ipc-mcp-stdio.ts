@@ -286,14 +286,19 @@ if (fs.existsSync(skillsBaseDir)) {
   try {
     const skillDirs = fs.readdirSync(skillsBaseDir);
     for (const skillName of skillDirs) {
-      const skillPath = path.join(skillsBaseDir, skillName, 'agent.js');
+      let skillPath = path.join(skillsBaseDir, skillName, 'agent.js');
+      if (!fs.existsSync(skillPath)) {
+        skillPath = path.join(skillsBaseDir, skillName, 'agent.ts');
+      }
+
       if (fs.existsSync(skillPath)) {
         try {
+          console.error(`Attempting to load skill from: ${skillPath}`);
           const skillModule = await import(skillPath);
           // Look for any exported function that matches create*Tools
           for (const key of Object.keys(skillModule)) {
             if (typeof skillModule[key] === 'function' && /^create.*Tools$/.test(key)) {
-              console.log(`Loading tools from skill: ${skillName} (${key})`);
+              console.error(`Loading tools from skill: ${skillName} (${key})`);
               const createToolsFn = skillModule[key];
               const registeredTools = createToolsFn({ groupFolder, isMain });
               for (const t of registeredTools) {
