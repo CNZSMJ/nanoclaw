@@ -1,6 +1,6 @@
 ---
 name: x-integration
-description: X (Twitter) integration for NanoClaw. Post tweets, like, reply, retweet, and quote. Use for setup, testing, or troubleshooting X functionality. Triggers on "setup x", "x integration", "twitter", "post tweet", "tweet".
+description: X (Twitter) integration for NanoClaw. Post, like, reply, retweet, quote, search, view profiles, and read tweets. Use for setup, testing, or troubleshooting X functionality. Triggers on "setup x", "x integration", "twitter", "post tweet", "tweet", "search twitter", "read tweet", "x search".
 ---
 
 # X (Twitter) Integration
