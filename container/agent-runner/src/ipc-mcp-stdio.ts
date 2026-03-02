@@ -280,24 +280,41 @@ Use available_groups.json to find the JID for a group. The folder name should be
   },
 );
 
-// Register X-Integration tools from runtime-synced path
-const xSkillPath = '/home/node/.claude/skills/x-integration/agent.js';
-if (fs.existsSync(xSkillPath)) {
+// Register tools from all synced skills in /home/node/.claude/skills/
+const skillsBaseDir = '/home/node/.claude/skills';
+if (fs.existsSync(skillsBaseDir)) {
   try {
-    const { createXTools } = await import(xSkillPath);
-    const xTools = createXTools({ groupFolder, isMain });
-    for (const t of xTools) {
-      // @ts-ignore - Map Agent SDK tool structure to MCP SDK tool structure
-      server.tool(t.name, t.description, t.inputSchema, async (args) => {
-        const result = await t.call(args);
-        return {
-          content: result.content,
-          isError: result.isError,
-        };
-      });
+    const skillDirs = fs.readdirSync(skillsBaseDir);
+    for (const skillName of skillDirs) {
+      const skillPath = path.join(skillsBaseDir, skillName, 'agent.js');
+      if (fs.existsSync(skillPath)) {
+        try {
+          const skillModule = await import(skillPath);
+          // Look for any exported function that matches create*Tools
+          for (const key of Object.keys(skillModule)) {
+            if (typeof skillModule[key] === 'function' && /^create.*Tools$/.test(key)) {
+              console.log(`Loading tools from skill: ${skillName} (${key})`);
+              const createToolsFn = skillModule[key];
+              const registeredTools = createToolsFn({ groupFolder, isMain });
+              for (const t of registeredTools) {
+                // @ts-ignore - Map Agent SDK tool structure to MCP SDK tool structure
+                server.tool(t.name, t.description, t.inputSchema, async (args) => {
+                  const result = await t.call(args);
+                  return {
+                    content: result.content,
+                    isError: result.isError,
+                  };
+                });
+              }
+            }
+          }
+        } catch (err) {
+          console.error(`Failed to load skill from ${skillPath}:`, err);
+        }
+      }
     }
   } catch (err) {
-    console.error(`Failed to load x-integration skill from ${xSkillPath}:`, err);
+    console.error(`Failed to scan skills directory ${skillsBaseDir}:`, err);
   }
 }
 
