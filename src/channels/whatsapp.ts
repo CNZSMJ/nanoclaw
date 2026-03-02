@@ -9,12 +9,14 @@ import makeWASocket, {
   fetchLatestWaWebVersion,
   makeCacheableSignalKeyStore,
   useMultiFileAuthState,
+  downloadMediaMessage,
 } from '@whiskeysockets/baileys';
 
 import {
   ASSISTANT_HAS_OWN_NUMBER,
   ASSISTANT_NAME,
   STORE_DIR,
+  DATA_DIR,
 } from '../config.js';
 import { getLastGroupSync, setLastGroupSync, updateChatName } from '../db.js';
 import { whatsappLogger as logger } from '../logger.js';
@@ -195,14 +197,47 @@ export class WhatsAppChannel implements Channel {
         // Only deliver full message for registered groups
         const groups = this.opts.registeredGroups();
         if (groups[chatJid]) {
-          const content =
+          let content =
             msg.message?.conversation ||
             msg.message?.extendedTextMessage?.text ||
             msg.message?.imageMessage?.caption ||
             msg.message?.videoMessage?.caption ||
             '';
 
-          // Skip protocol messages with no text content (encryption keys, read receipts, etc.)
+          let imageDescription = '';
+          if (msg.message?.imageMessage) {
+            try {
+              const buffer = await downloadMediaMessage(
+                msg,
+                'buffer',
+                {},
+                {
+                  logger,
+                  reuploadRequest: this.sock.updateMediaMessage
+                }
+              );
+
+              const groupFolder = groups[chatJid].folder;
+              const imagesDir = path.join(DATA_DIR, 'sessions', groupFolder, 'images');
+              fs.mkdirSync(imagesDir, { recursive: true });
+
+              const msgId = msg.key.id || `img_${Date.now()}`;
+              const imageFilename = `${msgId}.jpeg`;
+              const imagePath = path.join(imagesDir, imageFilename);
+
+              fs.writeFileSync(imagePath, buffer as Buffer);
+
+              const containerPath = `/workspace/group/images/${imageFilename}`;
+              imageDescription = `\n[用户附带了一张图片，存放在：${containerPath}]`;
+              logger.info({ chatJid, imageFilename }, 'Downloaded image message');
+            } catch (err) {
+              logger.error({ err, chatJid }, 'Failed to download image message');
+            }
+          }
+
+          content += imageDescription;
+
+          // Skip protocol messages with no text content and no image (encryption keys, read receipts, etc.)
           if (!content) continue;
 
           const sender = msg.key.participant || msg.key.remoteJid || '';
