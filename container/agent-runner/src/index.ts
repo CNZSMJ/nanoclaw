@@ -487,6 +487,7 @@ async function runQuery(
         'TodoWrite', 'ToolSearch', 'Skill',
         'NotebookEdit',
         'mcp__nanoclaw__*',
+        'mcp_nanoclaw_*',
         ...mcpAllowedTools
       ],
       env: sdkEnv,

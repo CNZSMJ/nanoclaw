@@ -60,8 +60,8 @@ RUN npm install
 # Copy source code
 COPY container/agent-runner/ ./
 
-# Copy skill MCP tools (baked into image as fallback)
-COPY .claude/skills/x-integration/agent.ts ./src/skills/x-integration/
+# Copy skill MCP tools (backed into image as fallback)
+COPY .claude/skills/x-integration/ ./src/skills/x-integration/
 
 # Build TypeScript
 RUN npm run build

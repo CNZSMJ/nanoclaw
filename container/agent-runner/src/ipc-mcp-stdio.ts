@@ -10,6 +10,7 @@ import { z } from 'zod';
 import fs from 'fs';
 import path from 'path';
 import { CronExpressionParser } from 'cron-parser';
+import { pathToFileURL } from 'url';
 
 const IPC_DIR = '/workspace/ipc';
 const MESSAGES_DIR = path.join(IPC_DIR, 'messages');
@@ -295,10 +296,15 @@ for (const skillsBaseDir of skillBaseDirs) {
 
         if (fs.existsSync(skillPath)) {
           try {
-            console.error(`Attempting to load skill from: ${skillPath}`);
-            const skillModule = await import(skillPath);
+            console.error(`[mcp-nanoclaw] Attempting to load skill from: ${skillPath}`);
+            const skillUrl = pathToFileURL(skillPath).href;
+            const skillModule = await import(skillUrl);
+
+            const exports = Object.keys(skillModule);
+            console.error(`[mcp-nanoclaw] Found exports in ${skillName}: ${exports.join(', ')}`);
+
             // Look for any exported function that matches create*Tools
-            for (const key of Object.keys(skillModule)) {
+            for (const key of exports) {
               if (typeof skillModule[key] === 'function' && /^create.*Tools$/.test(key)) {
                 console.error(`Loading tools from skill: ${skillName} (${key})`);
                 const createToolsFn = skillModule[key];
@@ -306,7 +312,12 @@ for (const skillsBaseDir of skillBaseDirs) {
                 for (const t of registeredTools) {
                   // @ts-ignore - Map Agent SDK tool structure to MCP SDK tool structure
                   server.tool(t.name, t.description, t.inputSchema, async (args) => {
+                    console.error(`[mcp-nanoclaw] Executing tool: ${t.name} with args: ${JSON.stringify(args)}`);
+                    const startTime = Date.now();
                     const result = await t.call(args);
+                    const duration = Date.now() - startTime;
+                    const resultPreview = (result.content?.[0] as any)?.text?.slice(0, 100) || '(no text content)';
+                    console.error(`[mcp-nanoclaw] Tool ${t.name} completed in ${duration}ms. Result: ${resultPreview}${resultPreview.length >= 100 ? '...' : ''}`);
                     return {
                       content: result.content,
                       isError: result.isError,
