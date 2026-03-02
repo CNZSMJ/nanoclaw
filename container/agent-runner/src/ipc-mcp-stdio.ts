@@ -16,6 +16,22 @@ const IPC_DIR = '/workspace/ipc';
 const MESSAGES_DIR = path.join(IPC_DIR, 'messages');
 const TASKS_DIR = path.join(IPC_DIR, 'tasks');
 
+// Debug logging to a shared file since stderr might be swallowed by the SDK
+const debugLogPath = path.join(IPC_DIR, 'mcp-debug.log');
+function debugLog(msg: string) {
+  const timestamp = new Date().toISOString();
+  const logMsg = `[${timestamp}] ${msg}\n`;
+  console.error(msg); // Keep console.error for standard logs
+  try {
+    fs.appendFileSync(debugLogPath, logMsg);
+  } catch (err) {
+    // Ignore logging errors
+  }
+}
+
+debugLog(`[mcp-nanoclaw] Server starting. chatJid=${process.env.NANOCLAW_CHAT_JID}, groupFolder=${process.env.NANOCLAW_GROUP_FOLDER}, isMain=${process.env.NANOCLAW_IS_MAIN}`);
+
+
 // Context from environment variables (set by the agent runner)
 const chatJid = process.env.NANOCLAW_CHAT_JID!;
 const groupFolder = process.env.NANOCLAW_GROUP_FOLDER!;
@@ -285,9 +301,11 @@ Use available_groups.json to find the JID for a group. The folder name should be
 const skillBaseDirs = ['/home/node/.claude/skills', '/app/src/skills'];
 
 for (const skillsBaseDir of skillBaseDirs) {
+  debugLog(`[mcp-nanoclaw] Checking skills directory: ${skillsBaseDir}`);
   if (fs.existsSync(skillsBaseDir)) {
     try {
       const skillDirs = fs.readdirSync(skillsBaseDir);
+      debugLog(`[mcp-nanoclaw] Found skill directories in ${skillsBaseDir}: ${skillDirs.join(', ')}`);
       for (const skillName of skillDirs) {
         let skillPath = path.join(skillsBaseDir, skillName, 'agent.js');
         if (!fs.existsSync(skillPath)) {
@@ -296,28 +314,29 @@ for (const skillsBaseDir of skillBaseDirs) {
 
         if (fs.existsSync(skillPath)) {
           try {
-            console.error(`[mcp-nanoclaw] Attempting to load skill from: ${skillPath}`);
+            debugLog(`[mcp-nanoclaw] Attempting to load skill from: ${skillPath}`);
             const skillUrl = pathToFileURL(skillPath).href;
             const skillModule = await import(skillUrl);
 
             const exports = Object.keys(skillModule);
-            console.error(`[mcp-nanoclaw] Found exports in ${skillName}: ${exports.join(', ')}`);
+            debugLog(`[mcp-nanoclaw] Found exports in ${skillName}: ${exports.join(', ')}`);
 
             // Look for any exported function that matches create*Tools
             for (const key of exports) {
               if (typeof skillModule[key] === 'function' && /^create.*Tools$/.test(key)) {
-                console.error(`Loading tools from skill: ${skillName} (${key})`);
+                debugLog(`[mcp-nanoclaw] Loading tools from skill: ${skillName} (${key})`);
                 const createToolsFn = skillModule[key];
                 const registeredTools = createToolsFn({ groupFolder, isMain });
+                debugLog(`[mcp-nanoclaw] Registered ${registeredTools.length} tools from ${skillName}`);
                 for (const t of registeredTools) {
                   // @ts-ignore - Map Agent SDK tool structure to MCP SDK tool structure
                   server.tool(t.name, t.description, t.inputSchema, async (args) => {
-                    console.error(`[mcp-nanoclaw] Executing tool: ${t.name} with args: ${JSON.stringify(args)}`);
+                    debugLog(`[mcp-nanoclaw] Executing tool: ${t.name} with args: ${JSON.stringify(args)}`);
                     const startTime = Date.now();
                     const result = await t.call(args);
                     const duration = Date.now() - startTime;
                     const resultPreview = (result.content?.[0] as any)?.text?.slice(0, 100) || '(no text content)';
-                    console.error(`[mcp-nanoclaw] Tool ${t.name} completed in ${duration}ms. Result: ${resultPreview}${resultPreview.length >= 100 ? '...' : ''}`);
+                    debugLog(`[mcp-nanoclaw] Tool ${t.name} completed in ${duration}ms. Result: ${resultPreview}${resultPreview.length >= 100 ? '...' : ''}`);
                     return {
                       content: result.content,
                       isError: result.isError,
@@ -327,13 +346,15 @@ for (const skillsBaseDir of skillBaseDirs) {
               }
             }
           } catch (err) {
-            console.error(`Failed to load skill from ${skillPath}:`, err);
+            debugLog(`[mcp-nanoclaw] Failed to load skill from ${skillPath}: ${err}`);
           }
         }
       }
     } catch (err) {
-      console.error(`Failed to scan skills directory ${skillsBaseDir}:`, err);
+      debugLog(`[mcp-nanoclaw] Failed to scan skills directory ${skillsBaseDir}: ${err}`);
     }
+  } else {
+    debugLog(`[mcp-nanoclaw] Skills directory does not exist: ${skillsBaseDir}`);
   }
 }
 
