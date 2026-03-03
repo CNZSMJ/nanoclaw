@@ -86,11 +86,11 @@ RUN mkdir -p /home/node/.cache/uv /home/node/.npm && \
     chown -R node:node /workspace /home/node && \
     chmod 777 /home/node
 # Switch to non-root user (required for --dangerously-skip-permissions)
-# Install XHS-Downloader
-RUN git clone https://github.com/JoeanAmier/XHS-Downloader.git /app/XHS-Downloader && \
-    cd /app/XHS-Downloader && \
+# Install XHS-Downloader into the workspace
+RUN git clone https://github.com/JoeanAmier/XHS-Downloader.git /workspace/group/XHS-Downloader && \
+    cd /workspace/group/XHS-Downloader && \
     uv pip install --system -r requirements.txt && \
-    chown -R node:node /app/XHS-Downloader
+    chown -R node:node /workspace/group/XHS-Downloader
 
 USER node
 

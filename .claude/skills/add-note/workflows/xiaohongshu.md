@@ -14,7 +14,7 @@
 | OCR/视觉能力（纯图场景） | 调用 minimax_coding_plan_mcp 的 `understand_image` | 能稳定返回图中文字 | 若调用失败则终止并提示检查 MCP 配置/API Key |
 
 若任一项不满足：向用户说明并终止，不继续执行。当帖子为纯图且无 OCR/视觉时，可说明无法生成 Takeaways/译文，仅保存图片链接。
-`XHS_Downloader` 默认集成于容器的 `/app/XHS-Downloader`（可在 manifest config 覆盖）。
+`XHS_Downloader` 的自动安装目标目录默认是 `groups/main/XHS-Downloader`（可在 manifest config 覆盖）。
 `minimax_coding_plan_mcp` 只按 MCP 配置检测（服务名默认 `minimax`），配置运行方式可为 `uvx minimax-coding-plan-mcp` 或 `uv tool run minimax-coding-plan-mcp`。
 
 ---
