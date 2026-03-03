@@ -22,6 +22,9 @@ IMAGE_MD_RE = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)")
 CJK_RE = re.compile(r"[\u4e00-\u9fff]")
 ASCII_ALPHA_RE = re.compile(r"[A-Za-z]")
 BAD_MEDIA_RE = re.compile(r"(?i)(\./media/|/media/)")
+XHS_OCR_MARK_LINE_RE = re.compile(r"(?m)^[ \t]*\[图\d+\s*OCR\][ \t]*\n?")
+TEMPLATE_IF_RE = re.compile(r"{{#if_([a-z_]+)}}(.*?){{/if_\1}}", re.S)
+TEMPLATE_VAR_RE = re.compile(r"{{[a-zA-Z0-9_]+}}")
 
 ALLOWED_EXTS = {"png", "jpg", "jpeg", "webp", "gif", "bmp", "svg"}
 MIME_TO_EXT = {
@@ -31,6 +34,14 @@ MIME_TO_EXT = {
     "image/gif": "gif",
     "image/bmp": "bmp",
     "image/svg+xml": "svg",
+}
+SOURCE_LABEL_TO_KEY = {
+    "小红书": "xiaohongshu",
+    "X": "x",
+    "微信公众号": "wechat-official",
+    "RSS": "rss",
+    "网页": "generic",
+    "Pasted": "pasted",
 }
 
 
@@ -199,6 +210,45 @@ def format_filename(pattern: str, slug: str, date_str: str, index: Optional[int]
     if index is not None:
         data["index"] = index
     return pattern.format(**data)
+
+
+def source_key_from_label(source_label: str) -> str:
+    key = SOURCE_LABEL_TO_KEY.get(source_label)
+    if key:
+        return key
+    fallback = re.sub(r"[^0-9A-Za-z]+", "-", source_label.strip().lower()).strip("-")
+    return fallback or "unknown"
+
+
+def build_path_context(source_label: str, date_str: str, slug: str) -> Dict[str, str]:
+    year, month, day = "", "", ""
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", date_str):
+        year, month, day = date_str.split("-")
+    return {
+        "slug": slug,
+        "date": date_str,
+        "year": year,
+        "month": month,
+        "day": day,
+        "source": source_label,
+        "source_key": source_key_from_label(source_label),
+    }
+
+
+def render_path_template(template: str, context: Dict[str, str], field_name: str) -> str:
+    try:
+        return template.format(**context)
+    except KeyError as exc:  # noqa: PERF203
+        missing = str(exc).strip("'")
+        raise ValueError(f"config.{field_name} uses unknown placeholder: {{{missing}}}") from exc
+
+
+def resolve_config_path(raw_value: str, base_dir: pathlib.Path, context: Dict[str, str], field_name: str) -> pathlib.Path:
+    rendered = render_path_template(raw_value, context, field_name)
+    p = pathlib.Path(rendered).expanduser()
+    if not p.is_absolute():
+        p = (base_dir / p).resolve()
+    return p
 
 
 def resolve_note_path(notes_path: pathlib.Path, base_filename: str, strategy: str, date_str: str) -> pathlib.Path:
@@ -397,6 +447,13 @@ def replace_and_download_images(
     return "".join(pieces), downloads, image_idx
 
 
+def sanitize_excerpt_for_note(excerpt: str) -> str:
+    """Remove internal OCR marker lines before final note rendering."""
+    out = XHS_OCR_MARK_LINE_RE.sub("", excerpt)
+    out = re.sub(r"\n{3,}", "\n\n", out)
+    return out.strip()
+
+
 def yq(s: str) -> str:
     return json.dumps(s, ensure_ascii=False)
 
@@ -405,8 +462,34 @@ def yl(items: Sequence[str]) -> str:
     return "[" + ", ".join(yq(x) for x in items) + "]"
 
 
+def load_note_template() -> str:
+    template_path = (pathlib.Path(__file__).resolve().parent.parent / "reference" / "note-template.md").resolve()
+    if not template_path.is_file():
+        raise FileNotFoundError(f"note template not found: {template_path}")
+    return template_path.read_text(encoding="utf-8")
+
+
+def render_markdown_template(template: str, values: Dict[str, str], flags: Dict[str, bool]) -> str:
+    def repl_if(m: re.Match[str]) -> str:
+        name = m.group(1)
+        block = m.group(2)
+        return block if flags.get(name, False) else ""
+
+    out = TEMPLATE_IF_RE.sub(repl_if, template)
+    for k, v in values.items():
+        out = out.replace(f"{{{{{k}}}}}", v)
+
+    unresolved = TEMPLATE_VAR_RE.findall(out)
+    if unresolved:
+        raise ValueError(f"note template has unresolved placeholders: {', '.join(sorted(set(unresolved)))}")
+
+    out = re.sub(r"\n{3,}", "\n\n", out).strip() + "\n"
+    return out
+
+
 def render_note(
     *,
+    template_text: str,
     source: str,
     title: str,
     collected_at: str,
@@ -420,36 +503,26 @@ def render_note(
     excerpt: str,
     notes: str,
 ) -> str:
-    fm = [
-        "---",
-        f"source: {yq(source)}",
-        f"title: {yq(title)}",
-        f"collected_at: {yq(collected_at)}",
-        f"category: {yq(category)}",
-        f"source_tags: {yl(source_tags)}",
-        f"ai_tags: {yl(ai_tags)}",
-        "---",
-        "",
-    ]
-
-    body: List[str] = [f"# {title}", ""]
-    if author:
-        body.extend([f"**作者**：{author}", ""])
-
-    body.append("## AI Takeaways")
-    body.append("")
-    for t in takeaways:
-        body.append(f"- {t}")
-    body.append("")
-
-    if lang == "en":
-        body.extend(["## 译文", "", translation, ""])
-
-    body.extend(["## 原文", "", excerpt, ""])
-    if notes:
-        body.extend(["---", "", "## Notes", "", notes, ""])
-
-    return "\n".join(fm + body).rstrip() + "\n"
+    values = {
+        "source_fm": yq(source),
+        "title_fm": yq(title),
+        "collected_at_fm": yq(collected_at),
+        "category_fm": yq(category),
+        "source_tags_fm": yl(source_tags),
+        "ai_tags_fm": yl(ai_tags),
+        "title": title,
+        "author": author,
+        "takeaways": "\n".join([f"- {t}" for t in takeaways]),
+        "translation": translation,
+        "excerpt": excerpt,
+        "notes": notes,
+    }
+    flags = {
+        "author": bool(author),
+        "translation": lang == "en",
+        "notes": bool(notes),
+    }
+    return render_markdown_template(template_text, values, flags)
 
 
 def atomic_write(path: pathlib.Path, content: str, enabled: bool) -> None:
@@ -490,9 +563,11 @@ def process_payload(
 ) -> Dict[str, Any]:
     cfg = parse_manifest_config(manifest_path)
     categories, tag_rules = parse_manifest_quality(manifest_path)
+    note_template = load_note_template()
+    base_dir = manifest_path.parent.resolve()
 
-    notes_path = pathlib.Path(str(cfg.get("notes_path", ""))).expanduser()
-    attachments_path = pathlib.Path(str(cfg.get("attachments_path", ""))).expanduser()
+    notes_path_tpl = str(cfg.get("notes_path", "")).strip()
+    attachments_path_tpl = str(cfg.get("attachments_path", "")).strip()
     note_name_fmt = str(cfg.get("note_filename_format", "{slug}.md"))
     attachment_name_fmt = str(cfg.get("attachment_filename_format", "{slug}_{index:02}.{ext}"))
     conflict_strategy = str(cfg.get("note_conflict_strategy", "suffix-date-counter"))
@@ -500,14 +575,7 @@ def process_payload(
     max_images = int(cfg.get("max_images", "30"))
     atomic = to_bool(str(cfg.get("atomic_write", "true")), default=True)
     ensure_dirs = to_bool(str(cfg.get("ensure_dirs", "true")), default=True)
-    index_file_raw = str(cfg.get("index_file", "")).strip()
-    index_file = pathlib.Path(index_file_raw).expanduser() if index_file_raw else None
-
-    if ensure_dirs:
-        notes_path.mkdir(parents=True, exist_ok=True)
-        attachments_path.mkdir(parents=True, exist_ok=True)
-        if index_file:
-            index_file.parent.mkdir(parents=True, exist_ok=True)
+    index_file_tpl = str(cfg.get("index_file", "")).strip()
 
     outputs: List[Dict[str, Any]] = []
     failures: List[str] = []
@@ -525,6 +593,17 @@ def process_payload(
 
             slug = slugify(title)
             date_str = parse_date_str(collected_at)
+            path_context = build_path_context(source, date_str, slug)
+            notes_path = resolve_config_path(notes_path_tpl, base_dir, path_context, "notes_path")
+            attachments_path = resolve_config_path(attachments_path_tpl, base_dir, path_context, "attachments_path")
+            index_file = resolve_config_path(index_file_tpl, base_dir, path_context, "index_file") if index_file_tpl else None
+
+            if ensure_dirs:
+                notes_path.mkdir(parents=True, exist_ok=True)
+                attachments_path.mkdir(parents=True, exist_ok=True)
+                if index_file:
+                    index_file.parent.mkdir(parents=True, exist_ok=True)
+
             note_name = format_filename(note_name_fmt, slug=slug, date_str=date_str)
             note_path = resolve_note_path(notes_path, note_name, conflict_strategy, date_str)
 
@@ -542,8 +621,10 @@ def process_payload(
                 timeout=timeout,
                 max_images=max_images,
             )
+            excerpt_for_note = sanitize_excerpt_for_note(excerpt_local)
 
             content = render_note(
+                template_text=note_template,
                 source=source,
                 title=title,
                 collected_at=collected_at,
@@ -554,7 +635,7 @@ def process_payload(
                 takeaways=takeaways,
                 translation=translation,
                 lang=lang,
-                excerpt=excerpt_local,
+                excerpt=excerpt_for_note,
                 notes=notes,
             )
             atomic_write(note_path, content, enabled=atomic)
@@ -563,7 +644,7 @@ def process_payload(
                 raise ValueError("; ".join(post_errs))
 
             if index_file:
-                line = f"{date_str}|{title}|{category}\n"
+                line = f"- {date_str}|{title}|{category}\n"
                 with index_file.open("a", encoding="utf-8") as f:
                     f.write(line)
 

@@ -1,18 +1,18 @@
 # 路径与命名配置（用户可改）；Step 6 及图片落盘时读取
-# 笔记名：{slug}.md。附件名：{slug}_01、{slug}_02…（其中附件 {slug} 使用最终笔记文件名 stem，保证与笔记一致）
+# 笔记名：{slug}.md。媒体名：{slug}_01、{slug}_02…（媒体直接在 attachments_path 下，无子目录）
 config:
-  notes_path: /workspace/extra/obsidian/碎片阅读
+  notes_path: /workspace/extra/obsidian/碎片阅读/笔记
   note_filename_format: "{slug}.md"
   attachments_path: /workspace/extra/obsidian/碎片阅读/_attachments
   attachment_filename_format: "{slug}_{index:02}.{ext}"
-  index_file: /workspace/extra/obsidian/碎片阅读/index.md
+  index_file: /workspace/extra/obsidian/碎片阅读/目录.md
   ensure_dirs: true
   atomic_write: true
   note_conflict_strategy: "suffix-date-counter"
   download_timeout_seconds: 20
   max_images: 30
   xhs_downloader_path: "groups/main/XHS-Downloader"
-  xhs_auto_install: true
+  xhs_auto_install: false
   xhs_install_method: "auto" # auto | uv | pip
   xhs_install_repo: "https://github.com/JoeanAmier/XHS-Downloader.git"
   minimax_mcp_server_name: "minimax"
@@ -29,7 +29,7 @@ categories:
   other: "以上都不适用时"
 
 tag_rules:
-  style: "hashtag-zh-cn"
+  style: "lowercase-kebab-case"
   ai_min_tags: 2
   ai_max_tags: 5
   prefer_existing_tags: true
@@ -41,4 +41,4 @@ tag_rules:
     - notes
   normalization:
     separator: "-"
-    lowercase: false
+    lowercase: true

@@ -70,7 +70,7 @@ def main() -> int:
         print(f"[FAIL] {msg}")
         return 2
 
-    preflight_results = run_checks(args.source, workspace, cfg, args.require_digest)
+    preflight_results = run_checks(args.source, workspace, cfg, args.require_digest, manifest_path)
     preflight_failed = [r for r in preflight_results if not r[1]]
     for name, ok, msg in preflight_results:
         prefix = "[OK]" if ok else "[FAIL]"

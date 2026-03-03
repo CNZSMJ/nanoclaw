@@ -16,6 +16,15 @@ import sys
 import tempfile
 from typing import Dict, List, Tuple
 
+SOURCE_KEY_TO_LABEL = {
+    "xiaohongshu": "小红书",
+    "x": "X",
+    "wechat-official": "微信公众号",
+    "rss": "RSS",
+    "generic": "网页",
+    "pasted": "Pasted",
+}
+
 
 def _strip_quotes(v: str) -> str:
     v = v.strip()
@@ -117,6 +126,38 @@ def check_command(cmd: str) -> Tuple[bool, str]:
     if hit:
         return True, hit
     return False, f"command not found: {cmd}"
+
+
+def build_path_context(source_key: str, date_str: str = "2000-01-01", slug: str = "probe") -> Dict[str, str]:
+    year, month, day = "", "", ""
+    if len(date_str) >= 10 and date_str[4] == "-" and date_str[7] == "-":
+        year, month, day = date_str[:4], date_str[5:7], date_str[8:10]
+    source_label = SOURCE_KEY_TO_LABEL.get(source_key, source_key)
+    return {
+        "slug": slug,
+        "date": date_str,
+        "year": year,
+        "month": month,
+        "day": day,
+        "source": source_label,
+        "source_key": source_key,
+    }
+
+
+def render_path_template(template: str, context: Dict[str, str], field_name: str) -> str:
+    try:
+        return template.format(**context)
+    except KeyError as exc:  # noqa: PERF203
+        missing = str(exc).strip("'")
+        raise ValueError(f"config.{field_name} uses unknown placeholder: {{{missing}}}") from exc
+
+
+def resolve_cfg_path(raw_value: str, base_dir: pathlib.Path, context: Dict[str, str], field_name: str) -> pathlib.Path:
+    rendered = render_path_template(raw_value, context, field_name)
+    p = pathlib.Path(rendered).expanduser()
+    if not p.is_absolute():
+        p = (base_dir / p).resolve()
+    return p
 
 
 def run_cmd(
@@ -287,17 +328,40 @@ def ensure_xhs_downloader(workspace: pathlib.Path, cfg: Dict[str, str]) -> Tuple
     return True, f"installed repo: {repo_dir}"
 
 
-def run_checks(source: str, workspace: pathlib.Path, cfg: Dict[str, str], require_digest: bool) -> List[Tuple[str, bool, str]]:
+def run_checks(
+    source: str,
+    workspace: pathlib.Path,
+    cfg: Dict[str, str],
+    require_digest: bool,
+    manifest_path: pathlib.Path | None = None,
+) -> List[Tuple[str, bool, str]]:
     results: List[Tuple[str, bool, str]] = []
     ensure_dirs = to_bool(cfg.get("ensure_dirs", "true"), default=True)
+    base_dir = manifest_path.parent.resolve() if manifest_path else workspace.resolve()
+    path_context = build_path_context(source)
 
     raw_notes = (cfg.get("notes_path") or "").strip()
     raw_attachments = (cfg.get("attachments_path") or "").strip()
     raw_index = (cfg.get("index_file") or "").strip()
 
-    notes_dir = pathlib.Path(raw_notes).expanduser() if raw_notes else None
-    attachments_dir = pathlib.Path(raw_attachments).expanduser() if raw_attachments else None
-    index_file = pathlib.Path(raw_index).expanduser() if raw_index else None
+    notes_dir = None
+    attachments_dir = None
+    index_file = None
+    if raw_notes:
+        try:
+            notes_dir = resolve_cfg_path(raw_notes, base_dir, path_context, "notes_path")
+        except Exception as exc:  # noqa: BLE001
+            results.append(("notes_path", False, str(exc)))
+    if raw_attachments:
+        try:
+            attachments_dir = resolve_cfg_path(raw_attachments, base_dir, path_context, "attachments_path")
+        except Exception as exc:  # noqa: BLE001
+            results.append(("attachments_path", False, str(exc)))
+    if raw_index:
+        try:
+            index_file = resolve_cfg_path(raw_index, base_dir, path_context, "index_file")
+        except Exception as exc:  # noqa: BLE001
+            results.append(("index_file", False, str(exc)))
 
     for name, d in (("notes_path", notes_dir), ("attachments_path", attachments_dir)):
         if d is None:
@@ -369,7 +433,7 @@ def main() -> int:
         print(f"[FAIL] manifest: {exc}")
         return 2
 
-    results = run_checks(args.source, workspace, cfg, args.require_digest)
+    results = run_checks(args.source, workspace, cfg, args.require_digest, manifest_path)
     has_fail = False
     for name, ok, msg in results:
         prefix = "[OK]" if ok else "[FAIL]"
