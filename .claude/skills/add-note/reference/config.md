@@ -18,7 +18,7 @@
 | note_conflict_strategy | 同名文件冲突策略。推荐 `suffix-date-counter`。 |
 | download_timeout_seconds | 图片下载超时时间（秒）。 |
 | max_images | 单篇最多下载图片数，超出部分保留远程 URL。 |
-| xhs_downloader_path | 小红书工具目录。默认 `groups/main/XHS-Downloader`（相对 workspace）。 |
+| xhs_downloader_path | 小红书工具目录。默认 `/workspace/group/XHS-Downloader`。 |
 | xhs_auto_install | 小红书流程缺少工具时是否自动安装。默认 `true`。 |
 | xhs_install_method | 自动安装依赖方式：`auto` / `uv` / `pip`。 |
 | xhs_install_repo | 缺失时 clone 的仓库地址。 |

@@ -268,13 +268,43 @@ def check_mcp_server_declared(workspace: pathlib.Path, cfg: Dict[str, str]) -> T
 
 
 def resolve_xhs_downloader_dir(workspace: pathlib.Path, cfg: Dict[str, str]) -> pathlib.Path:
-    raw = cfg.get("xhs_downloader_path", "groups/main/XHS-Downloader").strip()
+    raw = cfg.get("xhs_downloader_path", "/workspace/group/XHS-Downloader").strip()
     if not raw:
-        raw = "groups/main/XHS-Downloader"
-    p = pathlib.Path(raw).expanduser()
-    if not p.is_absolute():
-        p = workspace / p
-    return p
+        raw = "/workspace/group/XHS-Downloader"
+
+    configured = pathlib.Path(raw).expanduser()
+    candidates: List[pathlib.Path] = []
+    if configured.is_absolute():
+        candidates.append(configured)
+    else:
+        candidates.append((workspace / configured).resolve())
+
+    # Common runtime/project layouts fallback (container/group variants).
+    candidates.extend(
+        [
+            (workspace / "groups" / "main" / "XHS-Downloader").resolve(),
+            (workspace / "XHS-Downloader").resolve(),
+            pathlib.Path("/workspace/group/XHS-Downloader"),
+            pathlib.Path("/workspace/group/groups/main/XHS-Downloader"),
+            pathlib.Path("/workspace/groups/main/XHS-Downloader"),
+        ]
+    )
+
+    dedup: List[pathlib.Path] = []
+    seen: set[str] = set()
+    for p in candidates:
+        key = str(p)
+        if key in seen:
+            continue
+        seen.add(key)
+        dedup.append(p)
+
+    for p in dedup:
+        if is_xhs_downloader_ready(p):
+            return p
+
+    # No ready repo found; keep configured target for potential auto-install.
+    return dedup[0]
 
 
 def is_xhs_downloader_ready(repo_dir: pathlib.Path) -> bool:

@@ -644,7 +644,9 @@ def process_payload(
                 raise ValueError("; ".join(post_errs))
 
             if index_file:
-                line = f"- {date_str}|{title}|{category}\n"
+                rel = os.path.relpath(note_path, start=index_file.parent).replace("\\", "/")
+                safe_title = title.replace("]", "\\]")
+                line = f"- {date_str}|[{safe_title}]({rel})|{category}\n"
                 with index_file.open("a", encoding="utf-8") as f:
                     f.write(line)
 
