@@ -11,7 +11,7 @@ config:
   note_conflict_strategy: "suffix-date-counter"
   download_timeout_seconds: 20
   max_images: 30
-  xhs_downloader_path: "groups/main/XHS-Downloader"
+  xhs_downloader_path: "/app/XHS-Downloader"
   xhs_auto_install: false
   xhs_install_method: "auto" # auto | uv | pip
   xhs_install_repo: "https://github.com/JoeanAmier/XHS-Downloader.git"

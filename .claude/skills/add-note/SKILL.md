@@ -5,7 +5,7 @@ description: "Orchestrates link-to-notes pipeline: detect link source (Xiaohongs
 
 # 文章笔记工作流
 
-编排逻辑：**skill 被触发** → **确认是否执行** → **识别信息源** → **Preflight 门禁检查** → **执行采集 workflow** → **校验 payload** → **保存并加工**成笔记（分类、takeaways、标签）。
+编排逻辑：**skill 被触发** → **确认是否执行** → **识别信息源** → **本地存在性核实** → **Preflight 门禁检查** → **执行采集 workflow** → **校验 payload** → **保存并加工**成笔记（分类、takeaways、标签）。
 
 ## 何时使用
 
@@ -20,6 +20,7 @@ description: "Orchestrates link-to-notes pipeline: detect link source (Xiaohongs
 2. 询问用户：是否需要执行笔记生产流程？简要说明：将根据链接采集内容并整理成带分类、takeaways、标签的笔记。
 3. 用户选择 **y / 是 / 确认** → 继续 Step 2。
 4. 用户选择 **n / 否 / 取消** → 结束，不执行。
+5. 若用户问「是不是已经处理过」：必须先执行 Step 2.5 的本地核实命令，再回答；禁止直接凭记忆回复。
 
 ### Step 2：根据 URL 识别信息源（路由）
 
@@ -33,7 +34,17 @@ description: "Orchestrates link-to-notes pipeline: detect link source (Xiaohongs
 | RSS/Atom feed URL（如 `.xml`, `/feed`, `/rss`）或用户说「RSS 摘要」 | RSS | [workflows/rss.md](workflows/rss.md) |
 | 其他（通用网页） | Generic | [workflows/generic.md](workflows/generic.md) |
 
-多条链接时，对每条重复 Step 2～6。
+多条链接时，对每条重复 Step 2～6（含 Step 2.5）。
+
+### Step 2.5：本地存在性核实（必须）
+
+- 对每条 URL，必须先执行：
+  - `python3 scripts/check_existing_note.py --url <url> --manifest ./manifest.yaml`
+- 判定规则：
+  - 返回码 `0`（FOUND）：本地确有笔记包含该链接。可告知“已处理过”，并给出命中路径。
+  - 返回码 `1`（MISS）：本地未命中，必须继续正常处理流程。
+- 返回码 `2`：检查失败，需先修复再继续。
+- **禁止**仅凭会话记忆/模型记忆判断“已处理过”；必须以本地文件核实结果为准。
 
 ### Step 3：执行 Preflight 门禁（必须）
 
@@ -102,6 +113,7 @@ Step 1: 确认执行
   → 用户确认 → 继续
   → 用户拒绝 → 结束
 Step 2: 识别信息源（解析 URL → 选 workflow）
+Step 2.5: 本地存在性核实（check_existing_note）
 Step 3: 执行 preflight（路径可写 + 工具可用）
 Step 4: 执行 workflow（拉取 → 组装 payload）
 Step 5: 校验 payload（字段/格式）

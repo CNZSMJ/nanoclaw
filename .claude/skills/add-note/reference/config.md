@@ -18,7 +18,7 @@
 | note_conflict_strategy | 同名文件冲突策略。推荐 `suffix-date-counter`。 |
 | download_timeout_seconds | 图片下载超时时间（秒）。 |
 | max_images | 单篇最多下载图片数，超出部分保留远程 URL。 |
-| xhs_downloader_path | 小红书工具目录。默认 `groups/main/XHS-Downloader`（相对 workspace）。 |
+| xhs_downloader_path | 小红书工具目录。默认 `/app/XHS-Downloader`（容器内建路径）。 |
 | xhs_auto_install | 小红书流程缺少工具时是否自动安装。默认 `true`。 |
 | xhs_install_method | 自动安装依赖方式：`auto` / `uv` / `pip`。 |
 | xhs_install_repo | 缺失时 clone 的仓库地址。 |
@@ -44,14 +44,15 @@
 
 1. 一律通过统一入口执行：`python3 scripts/run_add_note.py --source <source> --payload <payload.json> --metadata <metadata.json> --manifest ./manifest.yaml --report-out <report.json>`。
 2. `run_add_note.py` 会先跑 Preflight（RSS digest 额外 `--require-digest`）；任一失败立即终止。
-3. 目录不可写或工具缺失时立即失败并退出，不写任何文件。
-4. 保存前必须通过 payload 校验；metadata 必须含 `category`、`ai_tags`、`takeaways`（英文源文需 `translation`）。
-5. 命名冲突时必须按策略生成新文件名，不允许覆盖旧文件。
-6. `source=xiaohongshu` 时，Preflight 会检查 `XHS_Downloader` 与 minimax：minimax 仅按 MCP 配置检测 `minimax_mcp_server_name`（读取顺序：`/workspace/global/.mcp.json`、`<workspace>/.claude/mcp.json`），并校验启动命令可执行（支持 `uvx` 与 `uv tool run`）。
-7. 小红书流程固定先 OCR 前两张图做探测；但只要存在图片，必须全量 OCR 全部图片（可分批调用），并在 excerpt 中按 `[图N OCR]` 输出逐图结果；缺任一图片 OCR 段则 payload 校验失败。
-8. 分类保持单分类；`source_tags` 保留原文标签，`ai_tags` 由模型按语义生成。
-9. frontmatter 必须包含 `source`、`title`、`collected_at`、`category`、`source_tags`、`ai_tags`；其中 `source` 必须为固定来源名（禁止 URL）。
-10. 禁止手工 `Edit/Bash` 直接写笔记与附件；postcheck 发现 `./media/` 路径将直接失败。
+3. 对每条 URL，保存前必须先执行 `python3 scripts/check_existing_note.py --url <url> --manifest ./manifest.yaml` 做本地存在性核实；禁止仅凭记忆判断“已处理过”。
+4. 目录不可写或工具缺失时立即失败并退出，不写任何文件。
+5. 保存前必须通过 payload 校验；metadata 必须含 `category`、`ai_tags`、`takeaways`（英文源文需 `translation`）。
+6. 命名冲突时必须按策略生成新文件名，不允许覆盖旧文件。
+7. `source=xiaohongshu` 时，Preflight 会检查 `XHS_Downloader` 与 minimax：minimax 仅按 MCP 配置检测 `minimax_mcp_server_name`（读取顺序：`/workspace/global/.mcp.json`、`<workspace>/.claude/mcp.json`），并校验启动命令可执行（支持 `uvx` 与 `uv tool run`）。
+8. 小红书流程固定先 OCR 前两张图做探测；但只要存在图片，必须全量 OCR 全部图片（可分批调用），并在 excerpt 中按 `[图N OCR]` 输出逐图结果；缺任一图片 OCR 段则 payload 校验失败。
+9. 分类保持单分类；`source_tags` 保留原文标签，`ai_tags` 由模型按语义生成。
+10. frontmatter 必须包含 `source`、`title`、`collected_at`、`category`、`source_tags`、`ai_tags`；其中 `source` 必须为固定来源名（禁止 URL）。
+11. 禁止手工 `Edit/Bash` 直接写笔记与附件；postcheck 发现 `./media/` 路径将直接失败。
 
 ## 命名冲突策略（suffix-date-counter）
 

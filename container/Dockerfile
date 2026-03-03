@@ -85,8 +85,13 @@ ENV NODE_PATH=/app/node_modules
 RUN mkdir -p /home/node/.cache/uv /home/node/.npm && \
     chown -R node:node /workspace /home/node && \
     chmod 777 /home/node
-
 # Switch to non-root user (required for --dangerously-skip-permissions)
+# Install XHS-Downloader
+RUN git clone https://github.com/JoeanAmier/XHS-Downloader.git /app/XHS-Downloader && \
+    cd /app/XHS-Downloader && \
+    uv pip install --system -r requirements.txt && \
+    chown -R node:node /app/XHS-Downloader
+
 USER node
 
 # Pre-install minimax-coding-plan-mcp for offline use

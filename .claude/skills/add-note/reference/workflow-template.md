@@ -25,6 +25,7 @@
 - `source` 必须写固定来源名（如 `小红书`、`X`、`微信公众号`、`RSS`、`网页`、`Pasted`），不要写 URL；原始链接放进 `excerpt`。
 - 处理流程最后必须执行 payload 校验（`scripts/validate_payload.py`），校验失败不得返回到编排层。
 - 最后一步：将 payload 交回编排层。不在 workflow 内写笔记文件或填分类/takeaways；编排层必须准备 metadata 并调用 `scripts/run_add_note.py` 执行落盘。
+- 编排层在进入本 workflow 前，必须先执行本地存在性核实：`python3 scripts/check_existing_note.py --url <url> --manifest ./manifest.yaml`。禁止仅凭记忆判断“已处理过”。
 
 ---
 

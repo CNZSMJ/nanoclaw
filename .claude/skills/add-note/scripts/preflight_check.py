@@ -268,9 +268,9 @@ def check_mcp_server_declared(workspace: pathlib.Path, cfg: Dict[str, str]) -> T
 
 
 def resolve_xhs_downloader_dir(workspace: pathlib.Path, cfg: Dict[str, str]) -> pathlib.Path:
-    raw = cfg.get("xhs_downloader_path", "groups/main/XHS-Downloader").strip()
+    raw = cfg.get("xhs_downloader_path", "/app/XHS-Downloader").strip()
     if not raw:
-        raw = "groups/main/XHS-Downloader"
+        raw = "/app/XHS-Downloader"
     p = pathlib.Path(raw).expanduser()
     if not p.is_absolute():
         p = workspace / p
