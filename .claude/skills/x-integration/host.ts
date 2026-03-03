@@ -8,12 +8,12 @@
 import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import pino from 'pino';
 
-const logger = pino({
-  level: process.env.LOG_LEVEL || 'info',
-  transport: { target: 'pino-pretty', options: { colorize: true } }
-});
+export interface XLogger {
+  info(obj: object, msg: string): void;
+  warn(obj: object, msg: string): void;
+  error(obj: object, msg: string): void;
+}
 
 interface SkillResult {
   success: boolean;
@@ -22,7 +22,7 @@ interface SkillResult {
 }
 
 // Run a skill script as subprocess
-async function runScript(script: string, args: object): Promise<SkillResult> {
+async function runScript(script: string, args: object, logger: XLogger): Promise<SkillResult> {
   const scriptPath = path.join(process.cwd(), '.claude', 'skills', 'x-integration', 'scripts', `${script}.ts`);
 
   return new Promise((resolve) => {
@@ -79,7 +79,8 @@ export async function handleXIpc(
   data: Record<string, unknown>,
   sourceGroup: string,
   isMain: boolean,
-  dataDir: string
+  dataDir: string,
+  logger: XLogger,
 ): Promise<boolean> {
   const type = data.type as string;
 
@@ -110,7 +111,7 @@ export async function handleXIpc(
         result = { success: false, message: 'Missing content' };
         break;
       }
-      result = await runScript('post', { content: data.content });
+      result = await runScript('post', { content: data.content }, logger);
       break;
 
     case 'x_like':
@@ -118,7 +119,7 @@ export async function handleXIpc(
         result = { success: false, message: 'Missing tweetUrl' };
         break;
       }
-      result = await runScript('like', { tweetUrl: data.tweetUrl });
+      result = await runScript('like', { tweetUrl: data.tweetUrl }, logger);
       break;
 
     case 'x_reply':
@@ -126,7 +127,7 @@ export async function handleXIpc(
         result = { success: false, message: 'Missing tweetUrl or content' };
         break;
       }
-      result = await runScript('reply', { tweetUrl: data.tweetUrl, content: data.content });
+      result = await runScript('reply', { tweetUrl: data.tweetUrl, content: data.content }, logger);
       break;
 
     case 'x_retweet':
@@ -134,7 +135,7 @@ export async function handleXIpc(
         result = { success: false, message: 'Missing tweetUrl' };
         break;
       }
-      result = await runScript('retweet', { tweetUrl: data.tweetUrl });
+      result = await runScript('retweet', { tweetUrl: data.tweetUrl }, logger);
       break;
 
     case 'x_quote':
@@ -142,7 +143,7 @@ export async function handleXIpc(
         result = { success: false, message: 'Missing tweetUrl or comment' };
         break;
       }
-      result = await runScript('quote', { tweetUrl: data.tweetUrl, comment: data.comment });
+      result = await runScript('quote', { tweetUrl: data.tweetUrl, comment: data.comment }, logger);
       break;
 
     case 'x_search':
@@ -150,7 +151,7 @@ export async function handleXIpc(
         result = { success: false, message: 'Missing query' };
         break;
       }
-      result = await runScript('search', { query: data.query });
+      result = await runScript('search', { query: data.query }, logger);
       break;
 
     case 'x_view_profile':
@@ -158,7 +159,7 @@ export async function handleXIpc(
         result = { success: false, message: 'Missing username' };
         break;
       }
-      result = await runScript('view_profile', { username: data.username, maxTweets: data.maxTweets || 5 });
+      result = await runScript('view_profile', { username: data.username, maxTweets: data.maxTweets || 5 }, logger);
       break;
 
     case 'x_read_tweet':
@@ -166,7 +167,7 @@ export async function handleXIpc(
         result = { success: false, message: 'Missing tweetUrl' };
         break;
       }
-      result = await runScript('read_tweet', { tweetUrl: data.tweetUrl });
+      result = await runScript('read_tweet', { tweetUrl: data.tweetUrl }, logger);
       break;
 
     default:

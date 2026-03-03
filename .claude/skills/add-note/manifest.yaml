@@ -1,0 +1,48 @@
+# 路径与命名配置（用户可改）；Step 6 及图片落盘时读取
+# 笔记名：{slug}.md。媒体名：{slug}_01、{slug}_02…（媒体直接在 attachments_path 下，无子目录）
+config:
+  notes_path: /workspace/extra/obsidian/碎片阅读
+  note_filename_format: "{slug}.md"
+  attachments_path: /workspace/extra/obsidian/碎片阅读/_attachments
+  attachment_filename_format: "{slug}_{index:02}.{ext}"
+  index_file: /workspace/extra/obsidian/碎片阅读/index.md
+  ensure_dirs: true
+  atomic_write: true
+  note_conflict_strategy: "suffix-date-counter"
+  download_timeout_seconds: 20
+  max_images: 30
+  xhs_downloader_path: "groups/main/XHS-Downloader"
+  xhs_auto_install: true
+  xhs_install_method: "auto" # auto | uv | pip
+  xhs_install_repo: "https://github.com/JoeanAmier/XHS-Downloader.git"
+  minimax_mcp_auto_install: true
+  minimax_mcp_package: "minimax-coding-plan-mcp"
+  minimax_mcp_install_method: "auto" # auto | uv | pip
+  minimax_uv_cache_dir: "/tmp/uv-cache"
+  minimax_uv_tool_dir: "/tmp/uv-tools"
+
+# 主分类与标签：Step 6 加工时使用；group 的 CLAUDE.md 有定义时优先用其约定
+categories:
+  tech: "AI、工程、数据与技术实现"
+  product: "产品策略、增长、商业化"
+  design: "交互、体验、视觉设计"
+  research: "研究、行业洞察、方法论"
+  tutorial: "教程、实操、清单"
+  management: "团队、组织与协作"
+  policy-risk: "监管、合规、安全与风险"
+  other: "以上都不适用时"
+
+tag_rules:
+  style: "lowercase-kebab-case"
+  ai_min_tags: 2
+  ai_max_tags: 5
+  prefer_existing_tags: true
+  max_new_tags_per_note: 2
+  include_topic_tag: true
+  forbidden_tags:
+    - misc
+    - random
+    - notes
+  normalization:
+    separator: "-"
+    lowercase: true

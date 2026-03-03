@@ -1,9 +1,10 @@
 ---
-source: ""          # URL 或 "Pasted" 或 "RSS: feed name"
+source: ""          # 固定来源名：小红书 / X / 微信公众号 / RSS / 网页 / Pasted
 title: ""
 collected_at: ""     # ISO 或 YYYY-MM-DD
-category: ""         # 如 tech, product, research, tutorial
-tags: []            # 3-8 个，小写、连字符
+category: ""         # 如 tech, product, design, research
+source_tags: []      # 原文自带标签（如 #AI / #创业）；若原文无标签则 []
+ai_tags: []          # agent 识别生成标签（2-5 个，小写、连字符）
 ---
 
 # 标题（与 frontmatter title 一致）
