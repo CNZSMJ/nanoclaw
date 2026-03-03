@@ -14,6 +14,8 @@ from typing import Any, Dict, List
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 URL_LIKE_RE = re.compile(r"^(https?://|www\.)", re.IGNORECASE)
 ALLOWED_SOURCES = {"小红书", "X", "微信公众号", "RSS", "网页", "Pasted"}
+IMAGE_MD_RE = re.compile(r"!\[[^\]]*\]\(([^)]+)\)")
+XHS_OCR_MARK_RE = re.compile(r"(?m)^\[图(\d+)\s*OCR\]")
 
 
 def load_input(input_arg: str) -> Any:
@@ -64,6 +66,18 @@ def validate_one(item: Dict[str, Any], idx: int) -> List[str]:
     excerpt = item.get("excerpt")
     if isinstance(excerpt, str) and "data:image/" in excerpt.lower():
         errs.append(f"item[{idx}].excerpt: base64 inline image is forbidden")
+
+    # XHS strictness: if images exist, OCR coverage must include every image in order.
+    if isinstance(source, str) and source.strip() == "小红书" and isinstance(excerpt, str):
+        image_count = len(IMAGE_MD_RE.findall(excerpt))
+        if image_count > 0:
+            marks = {int(m.group(1)) for m in XHS_OCR_MARK_RE.finditer(excerpt)}
+            missing = [n for n in range(1, image_count + 1) if n not in marks]
+            if missing:
+                errs.append(
+                    f"item[{idx}].excerpt: 小红书含图片时必须为每张图提供 OCR 段，"
+                    f"使用 [图N OCR]（缺失: {','.join(map(str, missing))}）"
+                )
 
     return errs
 

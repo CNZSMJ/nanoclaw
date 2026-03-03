@@ -43,8 +43,8 @@ description: "Orchestrates link-to-notes pipeline: detect link source (Xiaohongs
 - Preflight 必须覆盖：
   - 路径与写权限（`notes_path`、`attachments_path`、`index_file` 所在目录）。
   - 信息源所需工具/环境（见对应 workflow 的“必备的工具及环境”检查命令）。
-- 小红书场景：Preflight 必须检查 `XHS_Downloader` 和 `minimax_coding_plan_mcp`；若缺失且对应 auto install 配置为 `true`，需自动安装后再继续。
-- 小红书场景：采集流程固定 OCR 前两张图；若两图 OCR 合计字符数 `>20`，由模型判断正文是否主要在图片中。若是，则 payload 的 `excerpt` 必须同时包含页面正文与图片 OCR 文字。
+- 小红书场景：Preflight 必须检查 `XHS_Downloader` 和 `minimax_coding_plan_mcp`；其中 minimax 仅按 MCP 配置与命令可执行性判定，不做包安装判定。
+- 小红书场景：先 OCR 前两张做探测（`>20` 字符时由模型判断是否图片文本主导），但**只要有图片就必须全量 OCR 全部图片**；payload 的 `excerpt` 必须包含逐图 OCR 段落（`[图N OCR]`）以及原文图片列表。
 - 任一门禁失败：明确告知失败项与修复建议，**终止流程**，不继续采集与写文件。
 
 ### Step 4：执行采集 workflow
@@ -58,6 +58,7 @@ description: "Orchestrates link-to-notes pipeline: detect link source (Xiaohongs
 - 采集完成后，先执行 [scripts/validate_payload.py](scripts/validate_payload.py)。
 - 必填字段：`title`、`source`、`collected_at`、`excerpt`（均为非空字符串）。
 - `collected_at` 仅允许 `YYYY-MM-DD` 或 ISO 8601。
+- 小红书场景：若 excerpt 含图片，必须包含覆盖全部图片的 OCR 段落（`[图1 OCR] ... [图N OCR]`），否则校验失败。
 - 校验失败则终止，不得进入保存阶段。
 
 ### Step 6：保存并加工
@@ -88,7 +89,7 @@ description: "Orchestrates link-to-notes pipeline: detect link source (Xiaohongs
 | 字段 | 含义 |
 |------|------|
 | `category` | 主分类；必须在 `manifest.yaml` 的 `categories` 中。 |
-| `ai_tags` | 模型生成标签；数量需满足 `tag_rules.ai_min_tags`～`ai_max_tags`。 |
+| `ai_tags` | 模型生成标签；数量需满足 `tag_rules.ai_min_tags`～`ai_max_tags`，默认使用 `#标签` 形式（如 `#AI`、`#创业`）。 |
 | `takeaways` | 3-5 条要点。 |
 | `translation` | 仅英文源文必填。 |
 | `author` | 可选。 |

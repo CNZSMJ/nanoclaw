@@ -11,6 +11,15 @@
 | collected_at | string | `YYYY-MM-DD` 或 ISO 8601 |
 | excerpt | string | 非空；可含 Markdown 图片 URL，不允许 `data:image/...` base64 内联 |
 
+### 小红书附加约束（source=`小红书`）
+
+- 若 `excerpt` 含图片（`![...](...)`），必须包含覆盖全部图片的逐图 OCR 段落：
+  - `[图1 OCR]`
+  - `[图2 OCR]`
+  - ...
+  - `[图N OCR]`
+- 缺任一图片对应 OCR 段时，`validate_payload.py` 返回失败。
+
 ## 可选字段
 
 | 字段 | 类型 | 说明 |

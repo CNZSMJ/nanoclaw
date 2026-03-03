@@ -81,7 +81,7 @@ def parse_manifest_quality(manifest_path: pathlib.Path) -> Tuple[set[str], Dict[
     section = ""
     categories: set[str] = set()
     tag_rules: Dict[str, Any] = {
-        "style": "lowercase-kebab-case",
+        "style": "hashtag-zh-cn",
         "ai_min_tags": 2,
         "ai_max_tags": 5,
         "forbidden_tags": [],
@@ -242,12 +242,16 @@ def extract_source_tags(text: str) -> List[str]:
 
 
 def normalize_ai_tag(raw: str, sep: str = "-") -> str:
-    t = raw.strip().lstrip("#")
-    t = t.lower()
-    t = re.sub(r"[\s_]+", sep, t)
-    t = re.sub(rf"[^{re.escape(sep)}0-9a-z\u4e00-\u9fff]+", sep, t)
+    t = raw.strip()
+    if not t:
+        return ""
+    t = t.lstrip("#").strip()
+    t = re.sub(r"[\s\u3000_]+", sep, t)
+    t = re.sub(rf"[^{re.escape(sep)}0-9A-Za-z\u4e00-\u9fff]+", sep, t)
     t = re.sub(rf"{re.escape(sep)}{{2,}}", sep, t).strip(sep)
-    return t
+    if not t:
+        return ""
+    return f"#{t}"
 
 
 def normalize_ai_tags(tags: Sequence[str], tag_rules: Dict[str, Any]) -> List[str]:
@@ -258,7 +262,7 @@ def normalize_ai_tags(tags: Sequence[str], tag_rules: Dict[str, Any]) -> List[st
         if raw_sep:
             sep = raw_sep
 
-    forbidden = {str(x).strip().lower() for x in tag_rules.get("forbidden_tags", []) if str(x).strip()}
+    forbidden = {str(x).strip().lstrip("#").lower() for x in tag_rules.get("forbidden_tags", []) if str(x).strip()}
     seen: set[str] = set()
     out: List[str] = []
 
@@ -266,10 +270,11 @@ def normalize_ai_tags(tags: Sequence[str], tag_rules: Dict[str, Any]) -> List[st
         nt = normalize_ai_tag(str(t), sep=sep)
         if not nt:
             continue
-        if nt.lower() in forbidden:
+        key = nt.lstrip("#").lower()
+        if key in forbidden:
             continue
-        if nt not in seen:
-            seen.add(nt)
+        if key not in seen:
+            seen.add(key)
             out.append(nt)
     return out
 
@@ -328,7 +333,7 @@ def replace_and_download_images(
     note_path: pathlib.Path,
     attachments_path: pathlib.Path,
     attachment_filename_format: str,
-    slug: str,
+    attachment_slug: str,
     date_str: str,
     timeout: int,
     max_images: int,
@@ -345,12 +350,36 @@ def replace_and_download_images(
         url = target.split()[0].strip("<>").strip()
 
         replacement = m.group(0)
-        if url.lower().startswith(("http://", "https://")) and image_idx < max_images:
+        parsed = urllib.parse.urlparse(url)
+        scheme = parsed.scheme.lower()
+        is_remote = scheme in {"http", "https"}
+        is_local = scheme == "file" or scheme == ""
+
+        if (is_remote or is_local) and image_idx < max_images:
             image_idx += 1
             try:
-                data, ctype = download_bytes(url, timeout=timeout)
-                ext = detect_ext(url, ctype)
-                name = format_filename(attachment_filename_format, slug=slug, date_str=date_str, index=image_idx, ext=ext)
+                ctype = ""
+                source_hint = url
+                if is_remote:
+                    data, ctype = download_bytes(url, timeout=timeout)
+                else:
+                    local_path_raw = urllib.parse.unquote(parsed.path if scheme == "file" else url)
+                    local_candidate = pathlib.Path(local_path_raw)
+                    if not local_candidate.is_absolute():
+                        local_candidate = (note_path.parent / local_candidate).resolve()
+                    if not local_candidate.is_file():
+                        raise FileNotFoundError(f"local image not found: {local_candidate}")
+                    data = local_candidate.read_bytes()
+                    source_hint = str(local_candidate)
+
+                ext = detect_ext(source_hint, ctype)
+                name = format_filename(
+                    attachment_filename_format,
+                    slug=attachment_slug,
+                    date_str=date_str,
+                    index=image_idx,
+                    ext=ext,
+                )
                 local_path = attachments_path / name
                 local_path.write_bytes(data)
                 rel = os.path.relpath(local_path, start=note_path.parent).replace("\\", "/")
@@ -358,7 +387,7 @@ def replace_and_download_images(
                 downloads.append({"url": url, "saved_to": str(local_path), "ok": True})
             except Exception as exc:  # noqa: BLE001
                 downloads.append({"url": url, "ok": False, "error": str(exc)})
-        elif url.lower().startswith(("http://", "https://")):
+        elif is_remote or is_local:
             downloads.append({"url": url, "ok": False, "error": "exceed max_images"})
 
         pieces.append(replacement)
@@ -508,7 +537,7 @@ def process_payload(
                 note_path=note_path,
                 attachments_path=attachments_path,
                 attachment_filename_format=attachment_name_fmt,
-                slug=slug,
+                attachment_slug=note_path.stem,
                 date_str=date_str,
                 timeout=timeout,
                 max_images=max_images,
@@ -534,8 +563,7 @@ def process_payload(
                 raise ValueError("; ".join(post_errs))
 
             if index_file:
-                rel = os.path.relpath(note_path, start=index_file.parent).replace("\\", "/")
-                line = f"- {date_str} | [{title}]({rel}) | {category} | source_tags={','.join(source_tags)} | ai_tags={','.join(ai_tags)}\n"
+                line = f"{date_str}|{title}|{category}\n"
                 with index_file.open("a", encoding="utf-8") as f:
                     f.write(line)
 

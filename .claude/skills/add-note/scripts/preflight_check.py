@@ -7,6 +7,7 @@ Checks path/readiness from manifest config and source-specific dependencies.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import pathlib
 import shutil
@@ -148,6 +149,83 @@ def run_cmd(
     return False, output[:500] if output else f"exit code {proc.returncode}"
 
 
+def load_mcp_servers(workspace: pathlib.Path) -> Dict[str, Dict[str, object]]:
+    """Load MCP server configs from common project paths.
+
+    Priority: global first, then group/local override.
+    """
+    merged: Dict[str, Dict[str, object]] = {}
+    candidates = [
+        # Host-level global MCP (mounted in container runtime).
+        pathlib.Path("/workspace/global/.mcp.json"),
+        workspace / ".claude" / "mcp.json",
+        workspace / "groups" / "main" / ".claude" / "mcp.json",
+    ]
+    for p in candidates:
+        if not p.is_file():
+            continue
+        try:
+            raw = json.loads(p.read_text(encoding="utf-8"))
+        except Exception:  # noqa: BLE001
+            continue
+        servers = raw.get("mcpServers")
+        if isinstance(servers, dict):
+            for k, v in servers.items():
+                if isinstance(v, dict):
+                    merged[str(k)] = v
+    return merged
+
+
+def check_mcp_server_declared(workspace: pathlib.Path, cfg: Dict[str, str]) -> Tuple[bool, str]:
+    """Check minimax MCP readiness via MCP config/runtime launcher only."""
+    server_name = (cfg.get("minimax_mcp_server_name", "minimax") or "minimax").strip()
+    servers = load_mcp_servers(workspace)
+    server = servers.get(server_name)
+    if not server:
+        return False, (
+            f"mcp server '{server_name}' not found "
+            f"(checked: /workspace/global/.mcp.json, <workspace>/.claude/mcp.json)"
+        )
+
+    cmd = str(server.get("command", "")).strip()
+    if not cmd:
+        return False, f"mcp server '{server_name}' missing command"
+    args = server.get("args")
+    if args is not None and not isinstance(args, list):
+        return False, f"mcp server '{server_name}' args must be a list"
+
+    lowered_args = [str(a).strip().lower() for a in args] if isinstance(args, list) else []
+    has_minimax_pkg = any("minimax-coding-plan-mcp" in a for a in lowered_args)
+    # Common launch styles:
+    # - uvx minimax-coding-plan-mcp
+    # - uv tool run minimax-coding-plan-mcp
+    if cmd in {"uvx", "uv"} and lowered_args and not has_minimax_pkg:
+        return False, (
+            f"mcp server '{server_name}' command is {cmd} but args do not include minimax-coding-plan-mcp"
+        )
+
+    # uvx is usually shipped alongside uv; accept either binary.
+    if cmd == "uvx":
+        ok_uvx, msg_uvx = check_command("uvx")
+        if ok_uvx:
+            return True, f"mcp server '{server_name}' declared with command uvx ({msg_uvx})"
+        ok_uv, msg_uv = check_command("uv")
+        if ok_uv:
+            return True, f"mcp server '{server_name}' declared with command uvx (uv available: {msg_uv})"
+        return False, f"mcp server '{server_name}' requires uvx/uv but neither found"
+
+    if cmd == "uv":
+        ok_uv, msg_uv = check_command("uv")
+        if ok_uv:
+            return True, f"mcp server '{server_name}' declared with command uv ({msg_uv})"
+        return False, f"mcp server '{server_name}' requires uv but command not found"
+
+    ok, msg = check_command(cmd)
+    if ok:
+        return True, f"mcp server '{server_name}' declared ({cmd}: {msg})"
+    return False, f"mcp server '{server_name}' declared but command not found: {cmd}"
+
+
 def resolve_xhs_downloader_dir(workspace: pathlib.Path, cfg: Dict[str, str]) -> pathlib.Path:
     raw = cfg.get("xhs_downloader_path", "groups/main/XHS-Downloader").strip()
     if not raw:
@@ -209,82 +287,6 @@ def ensure_xhs_downloader(workspace: pathlib.Path, cfg: Dict[str, str]) -> Tuple
     return True, f"installed repo: {repo_dir}"
 
 
-def minimax_uv_env(cfg: Dict[str, str]) -> Dict[str, str]:
-    cache_dir = cfg.get("minimax_uv_cache_dir", "/tmp/uv-cache").strip() or "/tmp/uv-cache"
-    tool_dir = cfg.get("minimax_uv_tool_dir", "/tmp/uv-tools").strip() or "/tmp/uv-tools"
-    return {"UV_CACHE_DIR": cache_dir, "UV_TOOL_DIR": tool_dir}
-
-
-def _has_minimax_via_pip(pkg: str) -> Tuple[bool, str]:
-    ok, msg = run_cmd([sys.executable, "-m", "pip", "show", pkg])
-    if not ok:
-        return False, msg
-    return True, f"pip package found: {pkg}"
-
-
-def has_minimax_coding_plan_mcp(cfg: Dict[str, str], pkg: str | None = None) -> Tuple[bool, str]:
-    pkg_name = (pkg or cfg.get("minimax_mcp_package", "minimax-coding-plan-mcp")).strip() or "minimax-coding-plan-mcp"
-    tool_bin = shutil.which("minimax-coding-plan-mcp")
-    if tool_bin:
-        return True, f"binary found: {tool_bin}"
-
-    if shutil.which("uv"):
-        ok, msg = run_cmd(["uv", "tool", "list"], extra_env=minimax_uv_env(cfg))
-        if ok:
-            normalized = msg.lower()
-            if pkg_name.lower() in normalized:
-                return True, f"uv tool installed: {pkg_name}"
-        else:
-            # Keep going; uv may be unavailable in current env, but pip install can still satisfy requirement.
-            msg = f"uv tool list failed: {msg}"
-
-    ok, pip_msg = _has_minimax_via_pip(pkg_name)
-    if ok:
-        return True, pip_msg
-    return False, f"{pkg_name} not installed"
-
-
-def ensure_minimax_coding_plan_mcp(cfg: Dict[str, str]) -> Tuple[bool, str]:
-    auto_install = to_bool(cfg.get("minimax_mcp_auto_install", "true"), default=True)
-    pkg = cfg.get("minimax_mcp_package", "minimax-coding-plan-mcp").strip() or "minimax-coding-plan-mcp"
-    install_method = cfg.get("minimax_mcp_install_method", "auto").strip().lower() or "auto"
-
-    ok, msg = has_minimax_coding_plan_mcp(cfg, pkg)
-    if ok:
-        return True, msg
-    if not auto_install:
-        return False, f"{msg} (auto install disabled)"
-
-    last_err = ""
-    if install_method in {"auto", "uv"}:
-        if shutil.which("uv"):
-            ok, install_msg = run_cmd(["uv", "tool", "install", pkg], extra_env=minimax_uv_env(cfg))
-            if ok:
-                ok, msg = has_minimax_coding_plan_mcp(cfg, pkg)
-                if ok:
-                    return True, f"installed with uv: {pkg}"
-            else:
-                last_err = f"uv install failed: {install_msg}"
-        elif install_method == "uv":
-            return False, "cannot install minimax mcp via uv: uv not found"
-
-    if install_method in {"auto", "pip"}:
-        ok, install_msg = run_cmd([sys.executable, "-m", "pip", "install", pkg])
-        if ok:
-            ok, msg = has_minimax_coding_plan_mcp(cfg, pkg)
-            if ok:
-                return True, f"installed with pip: {pkg}"
-        else:
-            last_err = (last_err + "; " if last_err else "") + f"pip install failed: {install_msg}"
-
-    ok, msg = has_minimax_coding_plan_mcp(cfg, pkg)
-    if ok:
-        return True, f"installed: {pkg}"
-    if last_err:
-        return False, f"auto-install minimax mcp failed: {last_err}"
-    return False, f"installed command ran but package still unavailable: {msg}"
-
-
 def run_checks(source: str, workspace: pathlib.Path, cfg: Dict[str, str], require_digest: bool) -> List[Tuple[str, bool, str]]:
     results: List[Tuple[str, bool, str]] = []
     ensure_dirs = to_bool(cfg.get("ensure_dirs", "true"), default=True)
@@ -315,7 +317,7 @@ def run_checks(source: str, workspace: pathlib.Path, cfg: Dict[str, str], requir
     if source == "xiaohongshu":
         ok, msg = ensure_xhs_downloader(workspace, cfg)
         results.append(("xhs-downloader", ok, msg))
-        ok, msg = ensure_minimax_coding_plan_mcp(cfg)
+        ok, msg = check_mcp_server_declared(workspace, cfg)
         results.append(("minimax-coding-plan-mcp", ok, msg))
 
     if source == "x":

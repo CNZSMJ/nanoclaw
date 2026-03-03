@@ -13,7 +13,7 @@
 ```json
 {
   "category": "tech",
-  "ai_tags": ["agent-workflow", "execution"],
+  "ai_tags": ["#AI", "#创业"],
   "takeaways": ["要点1", "要点2", "要点3"],
   "translation": "Only required when source text is English",
   "author": "可选",
@@ -50,7 +50,7 @@
 
 1. 计算笔记路径：`{notes_path}/{note_filename_format}`（代入 `{slug}`、`{date}`）。
 2. 命名冲突策略：按 [config.md](config.md) 的 `suffix-date-counter` 执行，禁止覆盖已有文件。
-3. 图片命名：`attachment_filename_format` 代入 `{slug}`、`{index}`、`{ext}`。
+3. 图片命名：`attachment_filename_format` 代入 `{slug}`、`{index}`、`{ext}`；其中 `{slug}` 固定使用最终笔记文件名 stem（与笔记名对齐）。
 
 ## 4. 图片落盘与链接替换
 
@@ -71,12 +71,12 @@
 
 1. 分类：优先 group 的 `CLAUDE.md` 约定，否则用 `manifest.yaml` 的 `categories`。
 2. `source_tags`：从 excerpt 的原文内容中提取 hashtag（如 `#AI`、`#创业`），按出现顺序去重；默认去掉 `#` 前缀后写入，若原文无标签则写 `[]`。
-3. `ai_tags`：按 `tag_rules` 生成（数量与风格按配置执行），不要覆盖 `source_tags`。
+3. `ai_tags`：按 `tag_rules` 生成（数量与风格按配置执行，默认 `#标签` 形式），不要覆盖 `source_tags`。
 4. 不得破坏正文结构（标题/作者/Takeaways/译文/原文）。
 
 ## 7. 可选：更新索引
 
-如果存在 `index_file`，追加或更新一行：日期、标题、分类、`source_tags`、`ai_tags`。
+如果存在 `index_file`，追加一行：`日期|标题|分类`（例如 `2026-03-04|AI创业观察|tech`）。
 
 ## 特殊情况：原文仅为图片且文字在图中
 
