@@ -29,4 +29,4 @@
    - **excerpt**: 先写 `原文链接：<url>`，再写正文全文（保留 Markdown 格式、代码块、图片链接）；若正文存在 hashtag（`#xxx`），必须原样保留。
 4. 执行 payload 校验：
    - `python3 scripts/validate_payload.py --input <payload.json>`
-5. 校验通过后返回 payload 给编排层。编排层会执行 [reference/save-and-process.md](../reference/save-and-process.md)；**不要**在此处填写分类/takeaways。
+5. 校验通过后返回 payload 给编排层。编排层必须准备 `metadata.json` 并调用 `python3 scripts/run_add_note.py ...` 执行落盘；**不要**在此处手工写笔记文件或附件。

@@ -46,14 +46,16 @@
 
 ## 严格执行要求
 
-1. 先跑 Preflight：`python3 scripts/preflight_check.py --source <source> --manifest ./manifest.yaml`（RSS digest 额外加 `--require-digest`）。
-2. 目录不可写或工具缺失时立即失败并退出，不写任何文件。
-3. 保存前必须通过 payload 校验：`python3 scripts/validate_payload.py --input <payload.json>`。
-4. 命名冲突时必须按策略生成新文件名，不允许覆盖旧文件。
-5. `source=xiaohongshu` 时，Preflight 会检查 `XHS_Downloader` 与 `minimax-coding-plan-mcp`；缺失且对应 auto install 为 `true` 时自动安装。
-6. 小红书流程固定先 OCR 前两张图：若两张 OCR 合计字符数 `>20`，再由模型判断正文是否大概率在图片中；若是，则 payload 的 excerpt 必须同时包含页面正文与图片 OCR 文字。
-7. 分类保持单分类；`source_tags` 保留原文标签，`ai_tags` 由模型按语义生成。
-8. frontmatter 必须包含 `source`、`title`、`collected_at`、`category`、`source_tags`、`ai_tags`；其中 `source` 必须为固定来源名（禁止 URL）。
+1. 一律通过统一入口执行：`python3 scripts/run_add_note.py --source <source> --payload <payload.json> --metadata <metadata.json> --manifest ./manifest.yaml --report-out <report.json>`。
+2. `run_add_note.py` 会先跑 Preflight（RSS digest 额外 `--require-digest`）；任一失败立即终止。
+3. 目录不可写或工具缺失时立即失败并退出，不写任何文件。
+4. 保存前必须通过 payload 校验；metadata 必须含 `category`、`ai_tags`、`takeaways`（英文源文需 `translation`）。
+5. 命名冲突时必须按策略生成新文件名，不允许覆盖旧文件。
+6. `source=xiaohongshu` 时，Preflight 会检查 `XHS_Downloader` 与 `minimax-coding-plan-mcp`；缺失且对应 auto install 为 `true` 时自动安装。
+7. 小红书流程固定先 OCR 前两张图：若两张 OCR 合计字符数 `>20`，再由模型判断正文是否大概率在图片中；若是，则 payload 的 excerpt 必须同时包含页面正文与图片 OCR 文字。
+8. 分类保持单分类；`source_tags` 保留原文标签，`ai_tags` 由模型按语义生成。
+9. frontmatter 必须包含 `source`、`title`、`collected_at`、`category`、`source_tags`、`ai_tags`；其中 `source` 必须为固定来源名（禁止 URL）。
+10. 禁止手工 `Edit/Bash` 直接写笔记与附件；postcheck 发现 `./media/` 路径将直接失败。
 
 ## 命名冲突策略（suffix-date-counter）
 

@@ -81,6 +81,7 @@ RUN printf '#!/bin/bash\nset -e\ncd /app\ncat > /tmp/input.json\nnode --import t
 # Including cache directories for npm and uv
 ENV UV_CACHE_DIR=/home/node/.cache/uv
 ENV npm_config_cache=/home/node/.npm
+ENV NODE_PATH=/app/node_modules
 RUN mkdir -p /home/node/.cache/uv /home/node/.npm && \
     chown -R node:node /workspace /home/node && \
     chmod 777 /home/node

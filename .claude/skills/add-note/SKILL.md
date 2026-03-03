@@ -62,14 +62,15 @@ description: "Orchestrates link-to-notes pipeline: detect link source (Xiaohongs
 
 ### Step 6：保存并加工
 
-- 使用 Step 4 返回并在 Step 5 通过校验的 payload，按 [reference/save-and-process.md](reference/save-and-process.md) 执行。
+- 使用 Step 4 返回并在 Step 5 通过校验的 payload，**必须**调用统一执行器：
+  - `python3 scripts/run_add_note.py --source <source> --payload <payload.json> --metadata <metadata.json> --manifest ./manifest.yaml --report-out <report.json>`
+- `metadata.json` 至少包含：`category`、`ai_tags`、`takeaways`（英文源文还需 `translation`）。
 - **排版规则**：
   - **源文为英文**：标题、作者 → AI Takeaways → 译文 → 原文。
   - **源文为中文**：标题、作者 → AI Takeaways → 原文（**删除整个 `## 译文` 节**，不留空节）。
 - 分类与标签：从 [manifest.yaml](manifest.yaml) 读取 `categories`、`tag_rules`（与 config 同级）；其中 `source_tags` 来自原文 hashtag，`ai_tags` 由模型生成。若该 group 的 CLAUDE.md 有定义则优先用 group 的约定。说明见 [reference/config.md](reference/config.md)。
-- 写文件必须遵循：
-  - 原子写入（先写临时文件，再 rename）。
-  - 命名冲突策略（同名文件追加后缀，避免覆盖）。
+- **禁止**在该 skill 里直接用 `Edit/Bash` 手工写入笔记或附件目录；写入必须由 [scripts/save_and_process.py](scripts/save_and_process.py) 执行。
+- 执行器包含 postcheck：出现 `./media/` 路径或 frontmatter 缺字段会直接失败。
 
 ## Payload 字段说明（Step 4 产出，Step 6 使用）
 
@@ -81,6 +82,17 @@ description: "Orchestrates link-to-notes pipeline: detect link source (Xiaohongs
 | `excerpt` | **原文内容**：从该来源抓取到的完整或代表性内容，形态可为 **纯文本**、**文本+图片**、**文本+代码块**、**纯图片**。图片一律用 `![描述](图片URL)` 引用，**不要用 base64 内联**。 |
 
 **说明**：excerpt 中的图片 URL 由 Step 6 下载到本地并替换为相对路径；逻辑见 [reference/save-and-process.md](reference/save-and-process.md)，配置项见 [reference/config.md](reference/config.md)。payload 约束见 [reference/payload-schema.md](reference/payload-schema.md)。
+
+## Metadata 字段（Step 6 必填）
+
+| 字段 | 含义 |
+|------|------|
+| `category` | 主分类；必须在 `manifest.yaml` 的 `categories` 中。 |
+| `ai_tags` | 模型生成标签；数量需满足 `tag_rules.ai_min_tags`～`ai_max_tags`。 |
+| `takeaways` | 3-5 条要点。 |
+| `translation` | 仅英文源文必填。 |
+| `author` | 可选。 |
+| `notes` | 可选。 |
 
 ## 流程概览
 

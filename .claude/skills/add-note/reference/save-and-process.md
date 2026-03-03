@@ -2,12 +2,31 @@
 
 在任意信息源 workflow 返回采集结果且 payload 校验通过后执行。输入：`title`、`source`、`collected_at`、`excerpt`（可选 `author`）。
 其中 `source` 必须是固定来源名：`小红书` / `X` / `微信公众号` / `RSS` / `网页` / `Pasted`。
+执行时必须使用统一执行器：
+`python3 scripts/run_add_note.py --source <source> --payload <payload.json> --metadata <metadata.json> --manifest ./manifest.yaml --report-out <report.json>`。
+禁止手工 `Edit/Bash` 直接写笔记文件与附件目录。
+
+## metadata.json 结构
+
+支持单对象或对象数组（数组长度需与 payload items 一致）：
+
+```json
+{
+  "category": "tech",
+  "ai_tags": ["agent-workflow", "execution"],
+  "takeaways": ["要点1", "要点2", "要点3"],
+  "translation": "Only required when source text is English",
+  "author": "可选",
+  "notes": "可选"
+}
+```
 
 ## 0. 执行门禁（必须）
 
 1. Preflight 必须已通过（见 [scripts/preflight_check.py](../scripts/preflight_check.py)）。
 2. Payload 必须已通过校验（见 [scripts/validate_payload.py](../scripts/validate_payload.py)）。
-3. 任一条件不满足：停止流程，不写文件。
+3. Metadata 必须齐全（`category`、`ai_tags`、`takeaways`；英文源文需 `translation`）。
+4. 任一条件不满足：停止流程，不写文件。
 
 ## 1. slug 生成规则
 

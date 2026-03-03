@@ -30,14 +30,14 @@
    - **excerpt**: 先写 `原文链接：<item.link>`，再写 description 或 content 片段；若原文存在 hashtag（`#xxx`），必须原样保留。
 4. 对每条 payload 执行校验：
    - `python3 scripts/validate_payload.py --input <payload.json>`
-5. 返回通过校验的 payload 列表。编排层对每条执行一次 save-and-process。
+5. 返回通过校验的 payload 列表。编排层对每条准备 metadata，并逐条调用 `python3 scripts/run_add_note.py ...` 落盘。
 
 ### 场景 B：用户要求「RSS digest」（已配置的 feeds）
 
 1. 执行 digest 工具（如 `content-watcher run` 或 feed-digest 等价命令），得到带 title、link、summary 的条目列表。
 2. 对每条条目按场景 A 的格式组装 **collection payload**。
 3. 对每条 payload 执行校验：`python3 scripts/validate_payload.py --input <payload.json>`。
-4. 返回通过校验的 payload 列表；编排层对每条执行 save-and-process。
+4. 返回通过校验的 payload 列表；编排层对每条准备 metadata，并逐条调用 `python3 scripts/run_add_note.py ...` 落盘。
 
 ### 场景 C：用户发送的是单篇文章 URL（非 feed）
 

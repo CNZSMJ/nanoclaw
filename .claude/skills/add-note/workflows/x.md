@@ -27,4 +27,4 @@
    - **excerpt**: 先写 `原帖链接：<tweet_url>`，再写完整推文正文。若正文含 hashtag（如 `#AI`），必须原样保留，不要清洗。若推文包含图片或视频预览图，用 `![描述](图片URL)` 写入 excerpt（不要用 base64）。若拉取了回复，可追加 "Replies:" 及前 N 条回复内容（如 3–5 条）以保留上下文。
 4. 执行 payload 校验：
    - `python3 scripts/validate_payload.py --input <payload.json>`
-5. 校验通过后返回 payload 给编排层。**不要**在此处写笔记文件或填写分类/takeaways；编排层会接着执行 [reference/save-and-process.md](../reference/save-and-process.md)。
+5. 校验通过后返回 payload 给编排层。编排层必须准备 `metadata.json` 并调用 `python3 scripts/run_add_note.py ...` 执行落盘；**不要**在此处手工写笔记文件或附件。

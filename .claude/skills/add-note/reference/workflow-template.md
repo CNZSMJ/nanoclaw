@@ -24,7 +24,7 @@
 - Payload 字段：`title`、`source`、`collected_at`、**`excerpt`**。`excerpt` 为**原文内容**，形态可为：纯文本；文本+图片（图片用 URL，Markdown `![alt](url)`）；文本+代码块（Markdown 代码块）；纯图片（多图时用多行 `![描述](url)`，可加简短描述）。不在 payload 中使用 base64 图片。若原文含 `#tag`，需在 excerpt 保留原始 hashtag，供 Step 6 生成 `source_tags`。
 - `source` 必须写固定来源名（如 `小红书`、`X`、`微信公众号`、`RSS`、`网页`、`Pasted`），不要写 URL；原始链接放进 `excerpt`。
 - 处理流程最后必须执行 payload 校验（`scripts/validate_payload.py`），校验失败不得返回到编排层。
-- 最后一步：将 payload 交回编排层。不在 workflow 内写笔记文件或填分类/takeaways，由编排层随后执行 save-and-process。
+- 最后一步：将 payload 交回编排层。不在 workflow 内写笔记文件或填分类/takeaways；编排层必须准备 metadata 并调用 `scripts/run_add_note.py` 执行落盘。
 
 ---
 
