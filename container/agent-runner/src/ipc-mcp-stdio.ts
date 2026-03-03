@@ -298,7 +298,7 @@ Use available_groups.json to find the JID for a group. The folder name should be
 );
 
 // Check both runtime-synced path AND baked-in path
-const skillBaseDirs = ['/home/node/.claude/skills', '/app/src/skills'];
+const skillBaseDirs = ['/home/node/.claude/skills', '/app/dist/skills'];
 
 for (const skillsBaseDir of skillBaseDirs) {
   debugLog(`[mcp-nanoclaw] Checking skills directory: ${skillsBaseDir}`);

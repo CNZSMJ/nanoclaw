@@ -74,7 +74,8 @@ RUN ln -s /app/node_modules /home/node/.claude/node_modules
 
 # Create entrypoint script
 # Optimization: Use pre-built dist instead of re-compiling at runtime
-RUN printf '#!/bin/bash\nset -e\ncd /app\ncat > /tmp/input.json\nnode /app/dist/index.js < /tmp/input.json\n' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
+# We use --import tsx so dynamic inputs to .ts files in /home/node/.claude/skills work
+RUN printf '#!/bin/bash\nset -e\ncd /app\ncat > /tmp/input.json\nnode --import tsx /app/dist/index.js < /tmp/input.json\n' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
 # Set permissions to node user (non-root) for writable directories
 # Including cache directories for npm and uv
