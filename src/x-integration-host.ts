@@ -30,7 +30,8 @@ function runScript(script: string, args: object): Promise<SkillResult> {
   );
 
   return new Promise((resolve) => {
-    const proc = spawn('npx', ['tsx', scriptPath], {
+    const tsxBin = path.join(process.cwd(), 'node_modules', '.bin', 'tsx');
+    const proc = spawn(tsxBin, [scriptPath], {
       cwd: process.cwd(),
       env: { ...process.env, NANOCLAW_ROOT: process.cwd() },
       stdio: ['pipe', 'pipe', 'pipe'],
