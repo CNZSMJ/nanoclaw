@@ -49,7 +49,7 @@ export function cleanupLockFiles(): void {
   for (const lockFile of ['SingletonLock', 'SingletonSocket', 'SingletonCookie']) {
     const lockPath = path.join(config.browserDataDir, lockFile);
     if (fs.existsSync(lockPath)) {
-      try { fs.unlinkSync(lockPath); } catch {}
+      try { fs.unlinkSync(lockPath); } catch { }
     }
   }
 }
@@ -115,11 +115,19 @@ export async function navigateToTweet(
 
   try {
     await page.goto(url, { timeout: config.timeouts.navigation, waitUntil: 'domcontentloaded' });
-    await page.waitForTimeout(config.timeouts.pageLoad);
 
-    const exists = await page.locator('article[data-testid="tweet"]').first().isVisible().catch(() => false);
-    if (!exists) {
-      return { page, success: false, error: 'Tweet not found. It may have been deleted or the URL is invalid.' };
+    try {
+      await page.waitForSelector('article[data-testid="tweet"] [data-testid="User-Name"]', {
+        state: 'visible',
+        timeout: config.timeouts.elementWait + config.timeouts.pageLoad
+      });
+    } catch (e) {
+      // Check for obvious "not found" or suspended states
+      const emptyState = await page.locator('[data-testid="emptyState"]').isVisible().catch(() => false);
+      if (emptyState) {
+        return { page, success: false, error: 'Tweet not found. It may have been deleted or the URL is invalid.' };
+      }
+      return { page, success: false, error: 'Timeout waiting for tweet to load.' };
     }
 
     return { page, success: true };

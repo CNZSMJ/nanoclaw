@@ -30,10 +30,14 @@ function runScript(script: string, args: object): Promise<SkillResult> {
   );
 
   return new Promise((resolve) => {
-    const tsxBin = path.join(process.cwd(), 'node_modules', '.bin', 'tsx');
-    const proc = spawn(tsxBin, [scriptPath], {
+    const npxBin = process.env.NPX_PATH || '/opt/homebrew/bin/npx';
+    const proc = spawn(npxBin, ['tsx', scriptPath], {
       cwd: process.cwd(),
-      env: { ...process.env, NANOCLAW_ROOT: process.cwd() },
+      env: {
+        ...process.env,
+        NANOCLAW_ROOT: process.cwd(),
+        CHROME_PATH: process.env.CHROME_PATH || '/usr/bin/chromium',
+      },
       stdio: ['pipe', 'pipe', 'pipe'],
     });
 

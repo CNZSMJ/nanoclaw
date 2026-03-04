@@ -544,6 +544,26 @@ async function runQuery(
       }
     }
 
+    if (message.type === 'user') {
+      const usrMsg = message as any;
+      if (usrMsg.message?.content && Array.isArray(usrMsg.message.content)) {
+        const toolResults = usrMsg.message.content.filter((c: any) => c.type === 'tool_result');
+        for (const tr of toolResults) {
+          let trText = '';
+          if (typeof tr.content === 'string') {
+            trText = tr.content;
+          } else if (Array.isArray(tr.content)) {
+            trText = tr.content.filter((c: any) => c.type === 'text').map((c: any) => c.text).join('');
+          }
+          if (tr.is_error) {
+            trText = `[ERROR] ${trText}`;
+          }
+          const resultPreview = trText.replace(/\n/g, ' ').slice(0, 200);
+          log(`${agentTag} << Tool Result: ${resultPreview}${trText.length > 200 ? '...' : ''}`);
+        }
+      }
+    }
+
     if (message.type === 'tool_progress') {
       const tpMsg = message as any;
       const elapsed = tpMsg.elapsed_time_seconds?.toFixed(1) ?? '?';
@@ -552,9 +572,9 @@ async function runQuery(
 
     if (message.type === 'tool_use_summary') {
       const tsMsg = message as any;
-      // Observation: show first 120 chars of tool result
-      const resultPreview = (tsMsg.summary || '').replace(/\n/g, ' ').slice(0, 120);
-      log(`${agentTag} << Observation: ${resultPreview}${tsMsg.summary?.length > 120 ? '...' : ''}`);
+      // Observation: show first 200 chars of tool result
+      const resultPreview = (tsMsg.summary || '').replace(/\n/g, ' ').slice(0, 200);
+      log(`${agentTag} << Observation: ${resultPreview}${tsMsg.summary?.length > 200 ? '...' : ''}`);
     }
 
     if (message.type === 'system' && message.subtype === 'init') {

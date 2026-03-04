@@ -89,13 +89,13 @@ RUN mkdir -p /home/node/.cache/uv /home/node/.npm && \
 # Install XHS-Downloader into the workspace
 RUN git clone https://github.com/JoeanAmier/XHS-Downloader.git /workspace/group/XHS-Downloader && \
     cd /workspace/group/XHS-Downloader && \
-    uv pip install --system -r requirements.txt && \
+    uv pip install --system --break-system-packages -r requirements.txt && \
     chown -R node:node /workspace/group/XHS-Downloader
 
-USER node
-
-# Pre-install minimax-coding-plan-mcp for offline use
+# Pre-install minimax-coding-plan-mcp for offline use (needs root)
 RUN uv tool install minimax-coding-plan-mcp
+
+USER node
 
 # Set working directory to group workspace
 WORKDIR /workspace/group

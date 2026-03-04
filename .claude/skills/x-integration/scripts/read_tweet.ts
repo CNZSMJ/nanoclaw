@@ -34,21 +34,22 @@ async function readTweet(input: ReadInput): Promise<ScriptResult> {
             return { success: false, message: 'X restricted access to this tweet. Run /x-integration to re-authenticate or check your account status.' };
         }
 
-        // Scroll a bit to load replies
-        await page.evaluate(() => window.scrollBy(0, 800));
-        await page.waitForTimeout(1000);
+        // Twitter's UI is highly dynamic and uses React. Sometimes the article and User-Name
+        // are present, but the tweetText hasn't been mounted yet. We wait a bit to let the
+        // DOM settle before we try to extract texts.
+        await page.waitForTimeout(2000);
 
         const threadData = await page.evaluate(() => {
             const articleNodes = Array.from(document.querySelectorAll('article[data-testid="tweet"]'));
             if (articleNodes.length === 0) return null;
 
-            const parseArticle = (node: Element) => {
+            return articleNodes.map(node => {
                 const authorEl = node.querySelector('[data-testid="User-Name"]');
                 const authorInfo = authorEl ? authorEl.textContent : 'Unknown';
 
                 let handle = '';
                 const links = Array.from(authorEl?.querySelectorAll('a') || []);
-                const handleLink = links.find(a => a.href.includes('/'))?.getAttribute('href');
+                const handleLink = (links as HTMLAnchorElement[]).find(a => a.href.includes('/'))?.getAttribute('href');
                 if (handleLink) {
                     handle = handleLink.split('/')[1];
                 } else {
@@ -56,42 +57,51 @@ async function readTweet(input: ReadInput): Promise<ScriptResult> {
                     if (handleMatch) handle = handleMatch[1];
                 }
 
-                const textEl = node.querySelector('[data-testid="tweetText"]');
-                const text = textEl ? textEl.innerHTML.replace(/<br>/g, '\n').replace(/<[^>]*>?/gm, '') : '';
+                let textEl = node.querySelector('[data-testid="tweetText"]');
+                if (!textEl) {
+                    textEl = node.querySelector('div[lang]');
+                }
+
+                let text = '';
+                if (textEl) {
+                    text = textEl.innerHTML.replace(/<br>/g, '\n').replace(/<[^>]*>?/gm, '');
+                } else {
+                    text = (node as HTMLElement).innerText || '';
+                }
 
                 const timeEl = node.querySelector('time');
                 const timestamp = timeEl ? timeEl.getAttribute('datetime') : null;
 
-                // Get metrics if possible
-                const viewsStr = node.querySelector('[aria-label*="View"]')?.getAttribute('aria-label') || '';
-                const viewsMatch = viewsStr.match(/([\d,]+|\w+)\s+View/i);
-                const views = viewsMatch ? viewsMatch[1] : null;
+                const rawPhotos = Array.from(node.querySelectorAll('[data-testid="tweetPhoto"] img, img[alt="Image"], img[src*="media"], img'));
+                const photos = Array.from(new Set(rawPhotos
+                    .map(img => (img as HTMLImageElement).src)
+                    .filter(src => src && !src.includes('profile_images') && (src.includes('format=jpg') || src.includes('format=png') || src.includes('.jpg') || src.includes('.png')))));
 
-                const likesStr = node.querySelector('[data-testid="like"]')?.getAttribute('aria-label') || '';
-                const likesMatch = likesStr.match(/([\d,]+)\s+Like/i);
-                const likes = likesMatch ? likesMatch[1] : null;
+                const viewsEl = node.querySelector('a[href*="/analytics"]') || node.querySelector('[aria-label*="View"], [aria-label*="查看"]');
+                let views = viewsEl ? (viewsEl as HTMLElement).innerText.trim() : null;
+                if (views === '') views = '0';
 
-                const retweetsStr = node.querySelector('[data-testid="retweet"]')?.getAttribute('aria-label') || '';
-                const retweetsMatch = retweetsStr.match(/([\d,]+)\s+Retweet/i);
-                const retweets = retweetsMatch ? retweetsMatch[1] : null;
+                const likesEl = node.querySelector('[data-testid="like"], [data-testid="unlike"]');
+                let likes = likesEl ? (likesEl as HTMLElement).innerText.trim() : null;
+                if (likes === '') likes = '0';
 
-                const repliesStr = node.querySelector('[data-testid="reply"]')?.getAttribute('aria-label') || '';
-                const repliesMatch = repliesStr.match(/([\d,]+)\s+Repl/i);
-                const replies = repliesMatch ? repliesMatch[1] : null;
+                const retweetsEl = node.querySelector('[data-testid="retweet"], [data-testid="unretweet"]');
+                let retweets = retweetsEl ? (retweetsEl as HTMLElement).innerText.trim() : null;
+                if (retweets === '') retweets = '0';
+
+                const repliesEl = node.querySelector('[data-testid="reply"]');
+                let replies = repliesEl ? (repliesEl as HTMLElement).innerText.trim() : null;
+                if (replies === '') replies = '0';
 
                 return {
                     author: authorInfo,
                     handle,
                     text,
                     timestamp,
+                    photos: photos.length > 0 ? photos : undefined,
                     metrics: { views, likes, retweets, replies }
                 };
-            };
-
-            // The first article is typically the main tweet we navigated to (or part of the thread above it)
-            // More robust: Find the specific tweet by URL structure from data-testid="User-Name" links
-            // But for simplicity, we assume the first large one is main, or we just return the array
-            return articleNodes.map(parseArticle).filter(t => t.text.length > 0);
+            }).filter(t => t.text.length > 0);
         });
 
         if (!threadData || threadData.length === 0) {

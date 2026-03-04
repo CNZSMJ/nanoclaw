@@ -80,14 +80,14 @@ async function viewProfile(input: ProfileInput): Promise<ScriptResult> {
         });
 
         // Scroll and collect tweets until we reach maxTweets or can't find more
-        const tweetsList: any[] = [];
-        const seenTweetLinks = new Set<string>();
+        const tweetsList = [];
+        const seenTweetLinks = new Set();
 
         let scrollAttempts = 0;
         const maxScrolls = Math.ceil(maxTweets / 3) + 2; // Roughly 3 tweets per viewport
 
         while (tweetsList.length < maxTweets && scrollAttempts < maxScrolls) {
-            const currentBatch = await page.evaluate((username: string) => {
+            const currentBatch = await page.evaluate((username) => {
                 const tweetNodes = Array.from(document.querySelectorAll('article[data-testid="tweet"]'));
                 return tweetNodes.map(node => {
                     // Determine if it's a pinned tweet, retweet, or regular tweet

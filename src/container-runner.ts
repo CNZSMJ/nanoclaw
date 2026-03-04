@@ -2,7 +2,7 @@
  * Container Runner for NanoClaw
  * Spawns agent execution in containers and handles IPC
  */
-import { ChildProcess, exec, spawn } from 'child_process';
+import { ChildProcess, exec, spawn, execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
@@ -134,26 +134,48 @@ function buildVolumeMounts(
   }
 
   // Sync skills from container/skills/ into each group's .claude/skills/
-  const skillsSrc = path.join(process.cwd(), 'container', 'skills');
-  const skillsDst = path.join(groupSessionsDir, 'skills');
-  if (fs.existsSync(skillsSrc)) {
-    for (const skillDir of fs.readdirSync(skillsSrc)) {
-      const srcDir = path.join(skillsSrc, skillDir);
+  const syncSkills = (srcDirBase: string, dstDirBase: string) => {
+    if (!fs.existsSync(srcDirBase)) return;
+    for (const skillDir of fs.readdirSync(srcDirBase)) {
+      const srcDir = path.join(srcDirBase, skillDir);
       if (!fs.statSync(srcDir).isDirectory()) continue;
-      const dstDir = path.join(skillsDst, skillDir);
+      const dstDir = path.join(dstDirBase, skillDir);
       fs.cpSync(srcDir, dstDir, { recursive: true });
     }
-  }
+  };
 
-  // Also sync skills from project .claude/skills/
+  const skillsDst = path.join(groupSessionsDir, 'skills');
+  const skillsSrc = path.join(process.cwd(), 'container', 'skills');
   const projectSkillsSrc = path.join(projectRoot, '.claude', 'skills');
-  if (fs.existsSync(projectSkillsSrc)) {
-    for (const skillDir of fs.readdirSync(projectSkillsSrc)) {
-      const srcDir = path.join(projectSkillsSrc, skillDir);
-      if (!fs.statSync(srcDir).isDirectory()) continue;
-      const dstDir = path.join(skillsDst, skillDir);
-      fs.cpSync(srcDir, dstDir, { recursive: true });
+
+  syncSkills(skillsSrc, skillsDst);
+  syncSkills(projectSkillsSrc, skillsDst);
+
+  // Compile TypeScript skills into JavaScript in the destination directory
+  // ensures container loads the required agent.js seamlessly
+  try {
+    if (fs.existsSync(skillsDst)) {
+      for (const skillDir of fs.readdirSync(skillsDst)) {
+        const skillPath = path.join(skillsDst, skillDir);
+        const agentTsPath = path.join(skillPath, 'agent.ts');
+        if (fs.existsSync(agentTsPath)) {
+          const tscBin = path.join(projectRoot, 'node_modules', '.bin', 'tsc');
+          if (fs.existsSync(tscBin)) {
+            try {
+              execSync(
+                `${tscBin} ${agentTsPath} --skipLibCheck --experimentalDecorators --esModuleInterop --target ES2022 --module NodeNext --moduleResolution NodeNext`,
+                { stdio: 'ignore' },
+              );
+            } catch (err) {
+              // tsc may exit with non-zero code on type errors when no lib checks, but still emit agent.js.
+              // We ignore the error as long as agent.js is created.
+            }
+          }
+        }
+      }
     }
+  } catch (err) {
+    logger.error({ err }, 'Failed to compile skills sources on host');
   }
 
   mounts.push({
