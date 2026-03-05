@@ -68,13 +68,25 @@ export function validateContent(content: string | undefined, type = 'Tweet'): Sc
 }
 
 /**
- * Get browser context with persistent profile
+ * Get browser context - connects to existing Chrome via CDP if port configured,
+ * otherwise launches new browser with persistent profile
  */
 export async function getBrowserContext(): Promise<BrowserContext> {
   if (!fs.existsSync(config.authPath)) {
     throw new Error('X authentication not configured. Run /x-integration to complete login.');
   }
 
+  // If remote debugging port is configured, connect to existing Chrome
+  if (config.remoteDebuggingPort) {
+    console.error(`Connecting to Chrome via CDP on port ${config.remoteDebuggingPort}...`);
+    const cdpEndpoint = `http://localhost:${config.remoteDebuggingPort}`;
+    const browser = await chromium.connectOverCDP(cdpEndpoint);
+    // Return the default context
+    const context = browser.contexts()[0] || await browser.newContext();
+    return context;
+  }
+
+  // Otherwise launch new browser with persistent profile
   cleanupLockFiles();
 
   const context = await chromium.launchPersistentContext(config.browserDataDir, {

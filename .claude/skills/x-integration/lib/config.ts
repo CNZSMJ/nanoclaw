@@ -46,6 +46,10 @@ export const config = {
     tweetMaxLength: 280,
   },
 
+  // Chrome remote debugging port (for connecting to existing Chrome)
+  // Set to a port number to connect to existing Chrome instead of launching new
+  remoteDebuggingPort: parseInt(process.env.CHROME_REMOTE_DEBUG_PORT || '0', 10) || undefined,
+
   // Chrome launch arguments
   chromeArgs: [
     '--disable-blink-features=AutomationControlled',
@@ -54,6 +58,8 @@ export const config = {
     '--no-first-run',
     '--no-default-browser-check',
     '--disable-sync',
+    '--disable-dev-shm-usage',
+    '--disable-gpu',
   ],
 
   // Args to ignore when launching Chrome

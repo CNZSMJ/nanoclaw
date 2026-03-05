@@ -333,7 +333,7 @@ for (const skillsBaseDir of skillBaseDirs) {
                   server.tool(t.name, t.description, t.inputSchema, async (args) => {
                     debugLog(`[mcp-nanoclaw] Executing tool: ${t.name} with args: ${JSON.stringify(args)}`);
                     const startTime = Date.now();
-                    const result = await t.call(args);
+                    const result = await t.handler(args);
                     const duration = Date.now() - startTime;
                     const resultPreview = (result.content?.[0] as any)?.text?.slice(0, 100) || '(no text content)';
                     debugLog(`[mcp-nanoclaw] Tool ${t.name} completed in ${duration}ms. Result: ${resultPreview}${resultPreview.length >= 100 ? '...' : ''}`);
