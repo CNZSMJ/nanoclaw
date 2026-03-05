@@ -272,8 +272,15 @@ def resolve_note_path(notes_path: pathlib.Path, base_filename: str, strategy: st
 
 
 def detect_language(text: str) -> str:
-    cjk = len(CJK_RE.findall(text))
-    if cjk > 0:
+    """Detect language based on CJK character ratio.
+    Returns 'zh' if CJK characters make up 50% or more of the non-whitespace text.
+    """
+    cleaned = "".join(text.split())
+    if not cleaned:
+        return "zh"
+    cjk_count = len(CJK_RE.findall(cleaned))
+    ratio = cjk_count / len(cleaned)
+    if ratio >= 0.5:
         return "zh"
     return "en"
 
@@ -519,7 +526,7 @@ def render_note(
     }
     flags = {
         "author": bool(author),
-        "translation": lang == "en",
+        "translation": bool(translation),
         "notes": bool(notes),
     }
     return render_markdown_template(template_text, values, flags)
