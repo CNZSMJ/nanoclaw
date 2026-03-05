@@ -1,0 +1,14 @@
+{
+    "extends": "../tsconfig.json",
+    "compilerOptions": {
+        "rootDir": "..",
+        "rootDirs": [
+            "../src",
+            "./skills/add-whatsapp/add/src"
+        ]
+    },
+    "include": [
+        "skills/add-whatsapp/add/src/**/*",
+        "env.d.ts"
+    ]
+}
