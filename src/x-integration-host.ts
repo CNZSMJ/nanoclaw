@@ -36,7 +36,9 @@ function runScript(script: string, args: object): Promise<SkillResult> {
       env: {
         ...process.env,
         NANOCLAW_ROOT: process.cwd(),
-        CHROME_PATH: process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+        CHROME_PATH:
+          process.env.CHROME_PATH ||
+          '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
       },
       stdio: ['pipe', 'pipe', 'pipe'],
     });
