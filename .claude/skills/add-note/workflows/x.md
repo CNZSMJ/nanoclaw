@@ -9,7 +9,7 @@
 | 检查项 | 检查命令 | 通过条件 | 失败处理 |
 |------|----------|----------|----------|
 | x-integration 已接入 | `test -f .claude/skills/x-integration/agent.ts` | 返回码 0 | 提示用户先安装/接入 x-integration，终止 |
-| X 登录态存在 | `test -f data/x-auth.json` | 返回码 0 | 提示用户先执行 x setup，终止 |
+| X 登录态存在 | `test -f /workspace/project/data/x-auth.json` | 返回码 0 | 提示用户先执行 x setup，终止 |
 | `x_read_tweet` 工具可见 | 在当前会话工具列表中检查 `x_read_tweet` | 工具可调用 | 提示用户重启服务/重建容器后重试，终止 |
 | minimax_coding_plan_mcp 可用 (仅当使用 OCR 时) | 用户需在后续步骤确认触发 OCR 时检查。这里可预留检查逻辑：`python3 scripts/preflight_check.py --source xiaohongshu --manifest ./manifest.yaml` （借用小红书检查）| 输出包含 `[OK] minimax-coding-plan-mcp` | 若调用 OCR 时失败，提示检查 MCP 配置，但仍保留非 OCR 的推文内容并继续 |
 
