@@ -62,6 +62,42 @@ async function readTweet(input: ReadInput): Promise<ScriptResult> {
                     textEl = node.querySelector('div[lang]');
                 }
 
+                // New ordered content extraction
+                const orderedBlocks: Array<{ type: 'text' | 'photo', content: string }> = [];
+
+                // Helper to find ordered nodes
+                const walker = document.createTreeWalker(node, NodeFilter.SHOW_ELEMENT);
+                let currentNode = walker.nextNode();
+                const processedPhotos = new Set<string>();
+
+                while (currentNode) {
+                    const el = currentNode as HTMLElement;
+
+                    // 1. Text match (inside tweetText)
+                    if (el.getAttribute('data-testid') === 'tweetText' || (el.tagName === 'DIV' && el.getAttribute('lang'))) {
+                        const rawText = el.innerHTML.replace(/<br>/g, '\n').replace(/<[^>]*>?/gm, '').trim();
+                        if (rawText) {
+                            orderedBlocks.push({ type: 'text', content: rawText });
+                        }
+                    }
+
+                    // 2. Photo match (ignoring profile pictures)
+                    if (el.tagName === 'IMG' && (el as HTMLImageElement).src) {
+                        const src = (el as HTMLImageElement).src;
+                        const isMainMedia = (el.getAttribute('alt') === 'Image' || src.includes('media') || el.closest('[data-testid="tweetPhoto"]'));
+                        const isProfile = src.includes('profile_images');
+
+                        if (isMainMedia && !isProfile && !processedPhotos.has(src)) {
+                            // Check if it's a valid format
+                            if (src.includes('format=jpg') || src.includes('format=png') || src.includes('.jpg') || src.includes('.png')) {
+                                orderedBlocks.push({ type: 'photo', content: src });
+                                processedPhotos.add(src);
+                            }
+                        }
+                    }
+                    currentNode = walker.nextNode();
+                }
+
                 let text = '';
                 if (textEl) {
                     text = textEl.innerHTML.replace(/<br>/g, '\n').replace(/<[^>]*>?/gm, '');
@@ -72,10 +108,7 @@ async function readTweet(input: ReadInput): Promise<ScriptResult> {
                 const timeEl = node.querySelector('time');
                 const timestamp = timeEl ? timeEl.getAttribute('datetime') : null;
 
-                const rawPhotos = Array.from(node.querySelectorAll('[data-testid="tweetPhoto"] img, img[alt="Image"], img[src*="media"], img'));
-                const photos = Array.from(new Set(rawPhotos
-                    .map(img => (img as HTMLImageElement).src)
-                    .filter(src => src && !src.includes('profile_images') && (src.includes('format=jpg') || src.includes('format=png') || src.includes('.jpg') || src.includes('.png')))));
+                const photos = orderedBlocks.filter(b => b.type === 'photo').map(b => b.content);
 
                 const viewsEl = node.querySelector('a[href*="/analytics"]') || node.querySelector('[aria-label*="View"], [aria-label*="查看"]');
                 let views = viewsEl ? (viewsEl as HTMLElement).innerText.trim() : null;
@@ -96,12 +129,13 @@ async function readTweet(input: ReadInput): Promise<ScriptResult> {
                 return {
                     author: authorInfo,
                     handle,
-                    text,
+                    text: text || (orderedBlocks.filter(b => b.type === 'text').map(b => b.content).join('\n')),
                     timestamp,
                     photos: photos.length > 0 ? photos : undefined,
+                    ordered_content: orderedBlocks.length > 0 ? orderedBlocks : undefined,
                     metrics: { views, likes, retweets, replies }
                 };
-            }).filter(t => t.text.length > 0);
+            }).filter(t => t.text.length > 0 || t.ordered_content);
         });
 
         if (!threadData || threadData.length === 0) {
