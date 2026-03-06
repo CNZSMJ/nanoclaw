@@ -394,17 +394,28 @@ def replace_and_download_images(
     date_str: str,
     timeout: int,
     max_images: int,
-) -> Tuple[str, List[Dict[str, Any]], int]:
+    start_index: int = 0,
+    url_to_local_rel: Optional[Dict[str, str]] = None,
+) -> Tuple[str, List[Dict[str, Any]], int, Dict[str, str]]:
     pieces: List[str] = []
     last = 0
     downloads: List[Dict[str, Any]] = []
-    image_idx = 0
+    image_idx = start_index
+    if url_to_local_rel is None:
+        url_to_local_rel = {}
 
     for m in IMAGE_MD_RE.finditer(excerpt):
         pieces.append(excerpt[last : m.start()])
         alt = m.group(1)
         target = m.group(2).strip()
         url = target.split()[0].strip("<>").strip()
+
+        if url in url_to_local_rel:
+            rel = url_to_local_rel[url]
+            replacement = f"![{alt}]({rel})"
+            pieces.append(replacement)
+            last = m.end()
+            continue
 
         replacement = m.group(0)
         parsed = urllib.parse.urlparse(url)
@@ -441,6 +452,7 @@ def replace_and_download_images(
                 local_path.write_bytes(data)
                 rel = os.path.relpath(local_path, start=note_path.parent).replace("\\", "/")
                 replacement = f"![{alt}]({rel})"
+                url_to_local_rel[url] = rel
                 downloads.append({"url": url, "saved_to": str(local_path), "ok": True})
             except Exception as exc:  # noqa: BLE001
                 downloads.append({"url": url, "ok": False, "error": str(exc)})
@@ -451,7 +463,7 @@ def replace_and_download_images(
         last = m.end()
 
     pieces.append(excerpt[last:])
-    return "".join(pieces), downloads, image_idx
+    return "".join(pieces), downloads, image_idx, url_to_local_rel
 
 
 def sanitize_excerpt_for_note(excerpt: str) -> str:
@@ -618,7 +630,8 @@ def process_payload(
             category, ai_tags, takeaways, translation, notes = validate_meta(meta, categories, tag_rules, lang)
             source_tags = extract_source_tags(excerpt)
 
-            excerpt_local, downloads, _ = replace_and_download_images(
+            url_cache: Dict[str, str] = {}
+            excerpt_local, downloads, img_idx, url_cache = replace_and_download_images(
                 excerpt=excerpt,
                 note_path=note_path,
                 attachments_path=attachments_path,
@@ -627,8 +640,28 @@ def process_payload(
                 date_str=date_str,
                 timeout=timeout,
                 max_images=max_images,
+                start_index=0,
+                url_to_local_rel=url_cache,
             )
+            
+            translation_local = ""
+            if translation:
+                translation_local, trans_downloads, img_idx, url_cache = replace_and_download_images(
+                    excerpt=translation,
+                    note_path=note_path,
+                    attachments_path=attachments_path,
+                    attachment_filename_format=attachment_name_fmt,
+                    attachment_slug=note_path.stem,
+                    date_str=date_str,
+                    timeout=timeout,
+                    max_images=max_images,
+                    start_index=img_idx,
+                    url_to_local_rel=url_cache,
+                )
+                downloads.extend(trans_downloads)
+
             excerpt_for_note = sanitize_excerpt_for_note(excerpt_local)
+            translation_for_note = sanitize_excerpt_for_note(translation_local)
 
             content = render_note(
                 template_text=note_template,
@@ -640,7 +673,7 @@ def process_payload(
                 ai_tags=ai_tags,
                 author=author,
                 takeaways=takeaways,
-                translation=translation,
+                translation=translation_for_note,
                 lang=lang,
                 excerpt=excerpt_for_note,
                 notes=notes,
